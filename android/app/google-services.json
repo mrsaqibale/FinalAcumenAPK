@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "714296911275",
+    "project_id": "accumen-connectify",
+    "storage_bucket": "accumen-connectify.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:714296911275:android:5cd13a9c9f98a75d151eee",
+        "android_client_info": {
+          "package_name": "com.example.acumen"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyC67ld1ZzJh1o2LLXM6OjRBb-dYBac_4U4"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
