@@ -1,3 +1,4 @@
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -6,6 +7,10 @@ import 'routes/app_routes.dart';
 
 void main() async {
   // Ensure Flutter is initialized before using plugins
+
+  WidgetsFlutterBinding.ensureInitialized();  // Ensure that widget binding is initialized
+  await Firebase.initializeApp();  // Initialize Firebase
+
   WidgetsFlutterBinding.ensureInitialized();
   
   // Set preferred orientations to portrait only
