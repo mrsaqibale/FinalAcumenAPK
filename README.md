@@ -93,3 +93,54 @@ This project is licensed under the [MIT License](LICENSE).
 ## Contact
 
 For inquiries or support, please contact [your-email@example.com](mailto:your-email@example.com).
+
+# Acumen App - Image Caching Implementation
+
+## Overview
+This implementation adds image caching functionality to the Acumen app to improve performance and reduce data usage. Images are now stored locally using Hive, and a shimmer effect is shown during loading.
+
+## Features
+- **Local Image Caching**: Profile images are cached locally using Hive database
+- **Shimmer Loading Effect**: Shows a shimmer animation while images are loading
+- **Fallback Placeholders**: Displays a user icon when images fail to load
+- **Cache Clearing**: Cache is automatically cleared on logout
+- **Memory Efficient**: Only loads images from network when needed
+
+## Implementation Details
+The implementation consists of:
+
+1. **ImageCacheService**: A service that handles storing and retrieving images from the local cache
+2. **CachedProfileImage**: A reusable widget that displays profile images with caching and shimmer effects
+3. **Integration**: Updated all profile image displays across the app to use the new caching system
+
+## Key Files
+- `lib/services/image_cache_service.dart`: Core caching logic
+- `lib/widgets/cached_profile_image.dart`: Reusable UI component
+- Modified screens:
+  - Dashboard drawer
+  - User profile screen
+  - Edit profile screen
+  - Mentor screens
+  - Admin dashboard
+
+## Dependencies
+- `hive_flutter`: For local storage
+- `shimmer`: For loading effects
+
+## Usage
+The `CachedProfileImage` widget can be used like this:
+
+```dart
+CachedProfileImage(
+  imageUrl: user.photoUrl,
+  size: 120,
+  onTap: () => handleImageTap(context),
+)
+```
+
+## Benefits
+- Faster loading times for returning users
+- Reduced network requests
+- Better user experience with loading indicators
+- Consistent placeholder handling
+- Lower data usage

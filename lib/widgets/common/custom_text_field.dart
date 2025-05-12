@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-class CustomTextField extends StatelessWidget {
+class CustomTextField extends StatefulWidget {
   final String hintText;
   final TextEditingController? controller;
   final bool obscureText;
@@ -21,22 +21,48 @@ class CustomTextField extends StatelessWidget {
   });
 
   @override
+  State<CustomTextField> createState() => _CustomTextFieldState();
+}
+
+class _CustomTextFieldState extends State<CustomTextField> {
+  late bool _obscureText;
+
+  @override
+  void initState() {
+    super.initState();
+    _obscureText = widget.obscureText;
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Container(
       margin: const EdgeInsets.symmetric(vertical: 8),
       child: TextFormField(
-        controller: controller,
-        obscureText: obscureText,
-        keyboardType: keyboardType,
-        onChanged: onChanged,
-        validator: validator,
+        controller: widget.controller,
+        obscureText: _obscureText,
+        keyboardType: widget.keyboardType,
+        onChanged: widget.onChanged,
+        validator: widget.validator,
         decoration: InputDecoration(
-          hintText: hintText,
-          prefixIcon: prefixIcon != null 
+          hintText: widget.hintText,
+          prefixIcon: widget.prefixIcon != null 
             ? Padding(
                 padding: const EdgeInsets.all(8.0),
-                child: prefixIcon,
+                child: widget.prefixIcon,
               ) 
+            : null,
+          suffixIcon: widget.obscureText 
+            ? IconButton(
+                icon: Icon(
+                  _obscureText ? Icons.visibility_off : Icons.visibility,
+                  color: Colors.grey,
+                ),
+                onPressed: () {
+                  setState(() {
+                    _obscureText = !_obscureText;
+                  });
+                },
+              )
             : null,
           hintStyle: const TextStyle(color: Colors.grey),
           fillColor: const Color(0xFFF5F5F5),
