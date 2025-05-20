@@ -1,14 +1,15 @@
-import 'dart:math';
 import 'dart:async';
-import 'package:acumen/features/auth/controllers/auth_controller.dart';
+import 'dart:io';
 import 'package:acumen/features/chat/models/chat_conversation_model.dart';
 import 'package:acumen/features/chat/models/chat_message_model.dart';
 import 'package:acumen/features/chat/models/conversation_model.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_storage/firebase_storage.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:uuid/uuid.dart';
 import 'package:flutter/foundation.dart';
+import 'package:path/path.dart' as path;
 
 class ChatService {
   static const String _conversationsBoxName = 'conversations';
@@ -167,6 +168,31 @@ class ChatService {
       throw Exception('ChatService not initialized');
     }
     
+    // Check if participant is active
+    try {
+      final participantDoc = await _usersCollection.doc(participantId).get();
+      if (participantDoc.exists) {
+        final participantData = participantDoc.data() as Map<String, dynamic>;
+        final bool isActive = participantData['isActive'] ?? true;
+        
+        if (!isActive) {
+          throw Exception('Cannot create conversation with inactive user');
+        }
+      } else {
+        if (kDebugMode) {
+          print('Warning: Participant does not exist: $participantId');
+        }
+      }
+    } catch (e) {
+      if (e.toString().contains('Cannot create conversation with inactive user')) {
+        rethrow;
+      }
+      // Ignore other errors and proceed
+      if (kDebugMode) {
+        print('Error checking participant status: $e');
+      }
+    }
+    
     // Check if conversation already exists
     final existing = getConversationByParticipant(participantId);
     if (existing != null) {
@@ -304,27 +330,60 @@ class ChatService {
 
   // Get recent students (registered in the last 30 days)
   static Future<List<Map<String, dynamic>>> getRecentStudents() async {
-    final thirtyDaysAgo = DateTime.now().subtract(const Duration(days: 30));
-    final timestamp = Timestamp.fromDate(thirtyDaysAgo);
-    
-    final snapshot = await _usersCollection
-        .where('role', isEqualTo: 'student')
-        .where('createdAt', isGreaterThanOrEqualTo: timestamp)
-        .orderBy('createdAt', descending: true)
-        .get();
-    
-    return snapshot.docs.map((doc) {
-      final data = doc.data() as Map<String, dynamic>;
-      return {
-        'id': doc.id,
-        'name': data['name'] ?? 'Unknown',
-        'rollNumber': data['rollNo']?.toString() ?? '',
-        'email': data['email'] ?? '',
-        'createdAt': data['createdAt'] != null 
-            ? (data['createdAt'] as Timestamp).toDate() 
-            : DateTime.now(),
-      };
-    }).toList();
+    try {
+      final thirtyDaysAgo = DateTime.now().subtract(const Duration(days: 30));
+      
+      final usersQuery = await _usersCollection
+          .where('role', isEqualTo: 'student')
+          .where('isActive', isEqualTo: true)  // Only active users
+          .where('createdAt', isGreaterThan: thirtyDaysAgo)
+          .orderBy('createdAt', descending: true)
+          .limit(20)
+          .get();
+          
+      return usersQuery.docs.map((doc) {
+        final data = doc.data() as Map<String, dynamic>;
+        return {
+          'id': doc.id,
+          'name': data['name'] ?? 'Unknown',
+          'email': data['email'] ?? '',
+          'photoUrl': data['photoUrl'],
+          'role': data['role'] ?? 'student',
+        };
+      }).toList();
+    } catch (e) {
+      if (kDebugMode) {
+        print('Error getting recent students: $e');
+      }
+      return [];
+    }
+  }
+
+  // Get all users for chat (filtered by active status)
+  static Future<List<Map<String, dynamic>>> getAllUsers() async {
+    try {
+      final usersQuery = await _usersCollection
+          .where('isActive', isEqualTo: true)  // Only active users
+          .orderBy('name')
+          .limit(50)
+          .get();
+          
+      return usersQuery.docs.map((doc) {
+        final data = doc.data() as Map<String, dynamic>;
+        return {
+          'id': doc.id,
+          'name': data['name'] ?? 'Unknown',
+          'email': data['email'] ?? '',
+          'photoUrl': data['photoUrl'],
+          'role': data['role'] ?? 'student',
+        };
+      }).toList();
+    } catch (e) {
+      if (kDebugMode) {
+        print('Error getting all users: $e');
+      }
+      return [];
+    }
   }
 
   // Create a new community
@@ -382,11 +441,42 @@ class ChatService {
     });
   }
 
+  // Upload media file to Firebase Storage
+  static Future<String> uploadMediaFile({
+    required File file,
+    required String path,
+  }) async {
+    final currentUser = _auth.currentUser;
+    if (currentUser == null) {
+      throw Exception('User must be logged in to upload media');
+    }
+    
+    try {
+      // Create a storage reference for the file
+      final String fileName = '${DateTime.now().millisecondsSinceEpoch}_${file.path.split('/').last}';
+      final storageRef = FirebaseStorage.instance.ref().child(path).child(fileName);
+      
+      // Upload the file
+      final uploadTask = storageRef.putFile(file);
+      final snapshot = await uploadTask.whenComplete(() {});
+      
+      // Get the download URL
+      final downloadUrl = await snapshot.ref.getDownloadURL();
+      return downloadUrl;
+    } catch (e) {
+      if (kDebugMode) {
+        print('Error uploading media: $e');
+      }
+      throw Exception('Failed to upload media: $e');
+    }
+  }
+
   // Send a message to community
   static Future<void> sendCommunityMessage({
     required String communityId,
     required String text,
     String? imageUrl,
+    String? contentType,
   }) async {
     final currentUser = _auth.currentUser;
     if (currentUser == null) {
@@ -404,13 +494,24 @@ class ChatService {
       'senderName': userName,
       'text': text,
       'imageUrl': imageUrl,
+      'contentType': contentType ?? (imageUrl != null ? 'image' : 'text'),
       'timestamp': FieldValue.serverTimestamp(),
       'type': 'message',
     });
     
-    // Update community's last message
+    // Update community's last message with appropriate description based on content type
+    String lastMessage = text;
+    if (text.isEmpty && contentType != null) {
+      lastMessage = contentType == 'image' ? 'Sent an image' :
+                   contentType == 'video' ? 'Sent a video' :
+                   contentType == 'pdf' ? 'Sent a PDF document' :
+                   contentType == 'presentation' ? 'Sent a presentation' :
+                   contentType == 'voice' ? 'Sent a voice message' :
+                   'Sent a file';
+    }
+    
     await _communitiesCollection.doc(communityId).update({
-      'lastMessage': text,
+      'lastMessage': lastMessage,
       'lastMessageAt': FieldValue.serverTimestamp(),
     });
   }

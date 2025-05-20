@@ -1,22 +1,16 @@
 import 'package:acumen/features/profile/screens/new_user_profile_screen.dart';
 import 'package:acumen/features/search/screens/search_screen.dart';
-import 'package:acumen/features/auth/screens/login_screen.dart';
-import 'package:acumen/features/business/screens/career_counseling_screen.dart';
 import 'package:acumen/features/profile/screens/mentors_screen.dart';
 import 'package:acumen/features/chat/screens/chats_screen.dart';
-import 'package:acumen/features/notification/screens/notifications_screen.dart';
-import 'package:acumen/features/profile/screens/edit_profile_screen.dart';
 import 'package:acumen/theme/app_colors.dart';
-import 'package:acumen/features/profile/screens/settings_screen.dart';
-import 'package:acumen/theme/app_theme.dart';
 import 'package:flutter/material.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
-
-import 'admin_dashboard_screen.dart';
 import 'package:acumen/features/dashboard/widgets/dashboard_bottom_nav.dart';
 import 'package:acumen/features/dashboard/widgets/dashboard_drawer.dart';
 import 'package:acumen/features/dashboard/widgets/dashboard_header.dart';
 import 'package:acumen/features/dashboard/widgets/dashboard_menu_items.dart';
+import 'package:acumen/features/events/controllers/event_controller.dart';
+import 'package:provider/provider.dart';
 
 class DashboardScreen extends StatefulWidget {
   final String username;
@@ -33,6 +27,28 @@ class DashboardScreen extends StatefulWidget {
 class _DashboardScreenState extends State<DashboardScreen> {
   int _selectedIndex = 0;
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
+
+  @override
+  void initState() {
+    super.initState();
+    
+    // Check for expired events when dashboard loads
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        _checkExpiredEvents();
+      }
+    });
+  }
+
+  Future<void> _checkExpiredEvents() async {
+    try {
+      final eventController = Provider.of<EventController>(context, listen: false);
+      await eventController.loadEvents();
+      await eventController.checkForExpiredEvents(context);
+    } catch (e) {
+      debugPrint("Error checking expired events: $e");
+    }
+  }
 
   @override
   Widget build(BuildContext context) {

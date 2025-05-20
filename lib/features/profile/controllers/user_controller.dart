@@ -180,6 +180,38 @@ class UserController with ChangeNotifier {
     }
   }
 
+  // Update mentor approval status
+  Future<bool> updateMentorApprovalStatus(UserModel mentor, bool isApproved) async {
+    try {
+      final result = await _repository.updateMentorApprovalStatus(mentor.id, isApproved);
+      
+      if (result) {
+        // Update the local list
+        final index = _mentors.indexWhere((m) => m.id == mentor.id);
+        if (index != -1) {
+          _mentors[index] = UserModel(
+            id: mentor.id,
+            name: mentor.name,
+            email: mentor.email,
+            role: mentor.role,
+            isActive: mentor.isActive,
+            title: mentor.title,
+            photoUrl: mentor.photoUrl,
+            status: isApproved ? 'active' : 'pending_approval',
+            isApproved: isApproved,
+          );
+        }
+        notifyListeners();
+      }
+      
+      return result;
+    } catch (e) {
+      _error = 'Failed to update mentor approval status: $e';
+      notifyListeners();
+      return false;
+    }
+  }
+
   // Update teacher status
   Future<bool> updateTeacherStatus(UserModel teacher, String status) async {
     try {
@@ -245,12 +277,71 @@ class UserController with ChangeNotifier {
     return updateTeacherStatus(teacher, 'rejected');
   }
 
-  // Load all user types
+  // Load all users
   Future<void> loadAllUsers() async {
-    await loadUsersByRole('admin');
-    await loadUsersByRole('mentor');
-    await loadUsersByRole('student');
-    await loadUsersByRole('teacher');
-    await loadPendingTeacherApplications();
+    _isLoading = true;
+    _error = null;
+    notifyListeners();
+
+    try {
+      // Load all user types in parallel
+      await Future.wait([
+        loadUsersByRole('admin'),
+        loadUsersByRole('mentor'),
+        loadUsersByRole('student'),
+        loadPendingTeacherApplications(),
+      ]);
+      
+      _isLoading = false;
+      notifyListeners();
+    } catch (e) {
+      _error = 'Failed to load users: $e';
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  // Get user by ID
+  Future<Map<String, dynamic>?> getUserById(String userId) async {
+    try {
+      final user = await _repository.getUserById(userId);
+      if (user != null) {
+        return {
+          'id': user.id,
+          'name': user.name,
+          'email': user.email,
+          'role': user.role,
+          'isActive': user.isActive,
+          'title': user.title,
+          'photoUrl': user.photoUrl,
+          'status': user.status,
+          'isApproved': user.isApproved,
+          'education': user.education,
+          'quizStats': user.quizStats,
+          'recentQuizzes': user.recentQuizzes,
+        };
+      }
+      return null;
+    } catch (e) {
+      _error = 'Failed to get user: $e';
+      notifyListeners();
+      return null;
+    }
+  }
+
+  // Get currently logged in user
+  UserModel? getLoggedInUser() {
+    try {
+      // For now, return the first admin user as a placeholder
+      // In a real app, this would get the actual logged-in user from Firebase Auth
+      if (_admins.isNotEmpty) {
+        return _admins.first;
+      }
+      return null;
+    } catch (e) {
+      _error = 'Failed to get logged in user: $e';
+      notifyListeners();
+      return null;
+    }
   }
 } 

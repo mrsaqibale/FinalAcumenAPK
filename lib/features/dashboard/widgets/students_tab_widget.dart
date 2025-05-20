@@ -22,18 +22,23 @@ class StudentsTabWidget extends StatelessWidget {
         }
 
         final students = snapshot.data ?? [];
+        
+        // Filter out inactive students
+        final activeStudents = students.where((student) {
+          return student['isActive'] == true;
+        }).toList();
 
-        if (students.isEmpty) {
+        if (activeStudents.isEmpty) {
           return const Center(
-            child: Text('No students found'),
+            child: Text('No active students found'),
           );
         }
 
         return ListView.builder(
           padding: const EdgeInsets.all(16),
-          itemCount: students.length,
+          itemCount: activeStudents.length,
           itemBuilder: (context, index) {
-            final student = students[index];
+            final student = activeStudents[index];
             return Card(
               margin: const EdgeInsets.only(bottom: 8),
               child: ListTile(

@@ -1,21 +1,32 @@
 import 'package:flutter/material.dart';
 import 'package:acumen/theme/app_theme.dart';
+import 'package:acumen/features/settings/controllers/settings_controller.dart';
+import 'package:acumen/features/settings/widgets/settings_toggle_item.dart';
+import 'package:acumen/features/settings/widgets/settings_navigation_item.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
+import 'package:provider/provider.dart';
 import 'security_settings_screen.dart';
 import 'privacy_settings_screen.dart';
 
-class SettingsScreen extends StatefulWidget {
+class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
 
   @override
-  State<SettingsScreen> createState() => _SettingsScreenState();
+  Widget build(BuildContext context) {
+    return ChangeNotifierProvider(
+      create: (_) => SettingsController(),
+      child: const _SettingsScreenContent(),
+    );
+  }
 }
 
-class _SettingsScreenState extends State<SettingsScreen> {
-  bool notificationsEnabled = true;
+class _SettingsScreenContent extends StatelessWidget {
+  const _SettingsScreenContent();
 
   @override
   Widget build(BuildContext context) {
+    final settingsController = Provider.of<SettingsController>(context);
+
     return Scaffold(
       backgroundColor: AppTheme.primaryColor,
       appBar: AppBar(
@@ -48,130 +59,55 @@ class _SettingsScreenState extends State<SettingsScreen> {
           child: Column(
             children: [
               // Notifications toggle
-              _buildToggleItem(
+              SettingsToggleItem(
                 title: 'Notifications',
-                value: notificationsEnabled,
-                onChanged: (value) {
-                  setState(() {
-                    notificationsEnabled = value;
-                  });
-                },
+                value: settingsController.notificationsEnabled,
+                onChanged: (value) => settingsController.toggleNotifications(value),
               ),
               
               const SizedBox(height: 12),
               
               // Security option
-              _buildNavigationItem(
+              SettingsNavigationItem(
                 title: 'Security',
                 onTap: () {
-                   Navigator.push(
-                        context, 
-                        MaterialPageRoute(
-                          builder: (context) => const SecuritySettingsScreen(),
-                        ),
-                      );
+                  Navigator.push(
+                    context, 
+                    MaterialPageRoute(
+                      builder: (context) => const SecuritySettingsScreen(),
+                    ),
+                  );
                 },
               ),
               
               const SizedBox(height: 12),
               
               // Privacy option
-              _buildNavigationItem(
+              SettingsNavigationItem(
                 title: 'Privacy',
                 onTap: () {
-                   Navigator.push(
-                        context, 
-                        MaterialPageRoute(
-                          builder: (context) => const PrivacySettingsScreen(),
-                        ),
-                      );
+                  Navigator.push(
+                    context, 
+                    MaterialPageRoute(
+                      builder: (context) => const PrivacySettingsScreen(),
+                    ),
+                  );
                 },
               ),
               
               const SizedBox(height: 12),
               
               // Preferences option
-              _buildNavigationItem(
+              SettingsNavigationItem(
                 title: 'Preferences',
                 onTap: () {
                   Navigator.push(
-                        context, 
-                        MaterialPageRoute(
-                          builder: (context) => const SecuritySettingsScreen(),
-                        ),
-                      
+                    context, 
+                    MaterialPageRoute(
+                      builder: (context) => const SecuritySettingsScreen(),
+                    ),
                   );
                 },
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildToggleItem({
-    required String title,
-    required bool value,
-    required ValueChanged<bool> onChanged,
-  }) {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(30),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text(
-              title,
-              style: const TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-            Switch(
-              value: value,
-              onChanged: onChanged,
-              activeColor: Colors.white,
-              activeTrackColor: AppTheme.primaryColor,
-              inactiveThumbColor: Colors.white,
-              inactiveTrackColor: Colors.grey[300],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildNavigationItem({
-    required String title,
-    required VoidCallback onTap,
-  }) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(30),
-        ),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                title,
-                style: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-              const Icon(
-                Icons.chevron_right,
-                color: Colors.grey,
               ),
             ],
           ),

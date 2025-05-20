@@ -1,6 +1,9 @@
 import 'package:acumen/theme/app_theme.dart';
 import 'package:flutter/material.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:acumen/features/auth/screens/create_new_password_screen.dart';
+import 'package:acumen/services/session_timeout_service.dart';
 
 class SecuritySettingsScreen extends StatefulWidget {
   const SecuritySettingsScreen({super.key});
@@ -10,11 +13,53 @@ class SecuritySettingsScreen extends StatefulWidget {
 }
 
 class _SecuritySettingsScreenState extends State<SecuritySettingsScreen> {
-  bool _biometricEnabled = false;
-  bool _twoFactorEnabled = false;
-  bool _passwordLessLogin = false;
-  bool _sessionTimeout = true;
+  bool _sessionTimeout = false;
   final int _sessionTimeoutMinutes = 30;
+  static const String _timeoutKey = 'session_timeout_enabled';
+
+  @override
+  void initState() {
+    super.initState();
+    _loadSessionTimeout();
+  }
+
+  Future<void> _loadSessionTimeout() async {
+    final prefs = await SharedPreferences.getInstance();
+    setState(() {
+      _sessionTimeout = prefs.getBool(_timeoutKey) ?? false;
+    });
+  }
+
+  Future<void> _toggleSessionTimeout(bool value) async {
+    setState(() {
+      _sessionTimeout = value;
+    });
+    
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_timeoutKey, value);
+    
+    if (value) {
+      // Start session monitoring if enabled
+      SessionTimeoutService.startMonitoring(context);
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Auto logout after $_sessionTimeoutMinutes minutes enabled'),
+          duration: const Duration(seconds: 2),
+        ),
+      );
+    } else {
+      // Stop the timeout monitoring
+      SessionTimeoutService.dispose();
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Auto logout disabled'),
+          duration: Duration(seconds: 2),
+        ),
+      );
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -50,76 +95,16 @@ class _SecuritySettingsScreenState extends State<SecuritySettingsScreen> {
               child: ListView(
                 padding: const EdgeInsets.all(20),
                 children: [
-                  _buildSectionTitle('Authentication Options'),
-                  _buildSwitchTile(
-                    title: 'Enable Biometric Login',
-                    subtitle: 'Use fingerprint or face ID to log in',
-                    value: _biometricEnabled,
-                    onChanged: (value) {
-                      setState(() {
-                        _biometricEnabled = value;
-                      });
-                    },
-                    leadingIcon: FontAwesomeIcons.fingerprint,
-                  ),
-                  _buildSwitchTile(
-                    title: 'Two-Factor Authentication',
-                    subtitle: 'Receive a verification code via email or SMS',
-                    value: _twoFactorEnabled,
-                    onChanged: (value) {
-                      setState(() {
-                        _twoFactorEnabled = value;
-                      });
-                    },
-                    leadingIcon: FontAwesomeIcons.shieldHalved,
-                  ),
-                  _buildSwitchTile(
-                    title: 'Passwordless Login',
-                    subtitle: 'Login using email magic links',
-                    value: _passwordLessLogin,
-                    onChanged: (value) {
-                      setState(() {
-                        _passwordLessLogin = value;
-                      });
-                    },
-                    leadingIcon: FontAwesomeIcons.link,
-                  ),
-                  const Divider(),
                   _buildSectionTitle('Session Management'),
                   _buildSwitchTile(
                     title: 'Auto Logout',
                     subtitle: 'Automatically logout after $_sessionTimeoutMinutes minutes of inactivity',
                     value: _sessionTimeout,
-                    onChanged: (value) {
-                      setState(() {
-                        _sessionTimeout = value;
-                      });
-                    },
+                    onChanged: _toggleSessionTimeout,
                     leadingIcon: FontAwesomeIcons.clock,
                   ),
-                  ListTile(
-                    leading: Container(
-                      width: 40,
-                      height: 40,
-                      decoration: BoxDecoration(
-                        color: AppTheme.primaryColor.withAlpha(26),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Icon(
-                        FontAwesomeIcons.globe,
-                        color: AppTheme.primaryColor,
-                        size: 20,
-                      ),
-                    ),
-                    title: const Text('Active Sessions'),
-                    subtitle: const Text('Manage devices where you\'re logged in'),
-                    trailing: const Icon(Icons.chevron_right),
-                    onTap: () {
-                      // Navigate to active sessions screen
-                    },
-                  ),
                   const Divider(),
-                  _buildSectionTitle('Password & Recovery'),
+                  _buildSectionTitle('Password'),
                   ListTile(
                     leading: Container(
                       width: 40,
@@ -138,48 +123,15 @@ class _SecuritySettingsScreenState extends State<SecuritySettingsScreen> {
                     subtitle: const Text('Update your account password'),
                     trailing: const Icon(Icons.chevron_right),
                     onTap: () {
-                      // Navigate to change password screen
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const CreateNewPasswordScreen(),
+                        ),
+                      );
                     },
                   ),
-                  ListTile(
-                    leading: Container(
-                      width: 40,
-                      height: 40,
-                      decoration: BoxDecoration(
-                        color: AppTheme.primaryColor.withAlpha(26),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Icon(
-                        FontAwesomeIcons.envelope,
-                        color: AppTheme.primaryColor,
-                        size: 20,
-                      ),
-                    ),
-                    title: const Text('Recovery Email'),
-                    subtitle: const Text('Manage your recovery options'),
-                    trailing: const Icon(Icons.chevron_right),
-                    onTap: () {
-                      // Navigate to recovery options screen
-                    },
-                  ),
-                  const SizedBox(height: 20),
-                  OutlinedButton(
-                    style: OutlinedButton.styleFrom(
-                      side: BorderSide(color: Colors.red[400]!),
-                      padding: const EdgeInsets.symmetric(vertical: 15),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                    ),
-                    onPressed: () {
-                      // Show sign out from all devices dialog
-                      _showSignOutAllDevicesDialog();
-                    },
-                    child: Text(
-                      'Sign Out From All Devices',
-                      style: TextStyle(color: Colors.red[400]),
-                    ),
-                  ),
+                 
                 ],
               ),
             ),
@@ -260,17 +212,39 @@ class _SecuritySettingsScreenState extends State<SecuritySettingsScreen> {
               ),
               onPressed: () {
                 Navigator.of(context).pop();
-                // Implement sign out functionality
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Signed out from all devices.'),
-                  ),
-                );
+                // Sign out from all devices
+                _signOutFromAllDevices();
               },
             ),
           ],
         );
       },
     );
+  }
+  
+  Future<void> _signOutFromAllDevices() async {
+    try {
+      // Clear local auth token
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove('auth_token');
+      
+      // Here you would implement the API call to invalidate all sessions
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Signed out from all devices.'),
+        ),
+      );
+      
+      // Navigate to login screen
+      Navigator.of(context).pushNamedAndRemoveUntil('/login', (route) => false);
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error: ${e.toString()}'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
   }
 } 

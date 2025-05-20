@@ -28,14 +28,17 @@ class LoginService {
         print("Roll number: $rollNo");
       }
       
-      // Attempt login directly with roll number as username
-      final user = await _authController.signIn(
-        username: rollNo.trim(),
+      // Attempt login with roll number
+      final userCredential = await _authController.signIn(
+        rollNumber: rollNo.trim(),
         password: password,
         context: context,
       );
       
-      if (user != null && context.mounted) {
+      if (userCredential != null && context.mounted) {
+        final user = userCredential.user;
+        if (user == null) return false;
+
         // Check if email is verified
         if (!user.emailVerified) {
           if (kDebugMode) {

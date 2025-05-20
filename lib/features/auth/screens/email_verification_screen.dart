@@ -1,12 +1,10 @@
 import 'package:acumen/features/auth/controllers/auth_controller.dart';
 import 'package:acumen/theme/app_theme.dart';
-import 'package:acumen/widgets/auth/otp_input.dart';
 import 'package:acumen/widgets/common/primary_button.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 
-import 'create_new_password_screen.dart';
 
 class EmailVerificationScreen extends StatefulWidget {
   final String email;

@@ -1,4 +1,3 @@
-import 'package:acumen/features/auth/screens/mentor_signup_screen.dart';
 import 'package:acumen/features/auth/utils/login_validation.dart';
 import 'package:acumen/theme/app_theme.dart';
 import 'package:acumen/widgets/common/custom_text_field.dart';
@@ -242,30 +241,30 @@ class _SignupFormState extends State<SignupForm> {
                 ),
               ),
             ),
-            const SizedBox(height: 10),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const Text(
-                  "Are you a mentor?",
-                  style: TextStyle(color: Colors.grey),
-                ),
-                TextButton(
-                  onPressed: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => const MentorSignupScreen(),
-                      ),
-                    );
-                  },
-                  child: const Text(
-                    'Mentor Sign Up',
-                    style: TextStyle(color: AppTheme.accentColor),
-                  ),
-                ),
-              ],
-            ),
+            // const SizedBox(height: 10),
+            // Row(
+            //   mainAxisAlignment: MainAxisAlignment.center,
+            //   children: [
+            //     const Text(
+            //       "Are you a mentor?",
+            //       style: TextStyle(color: Colors.grey),
+            //     ),
+            //     TextButton(
+            //       onPressed: () {
+            //         Navigator.push(
+            //           context,
+            //           MaterialPageRoute(
+            //             builder: (context) => const MentorSignupScreen(),
+            //           ),
+            //         );
+            //       },
+            //       child: const Text(
+            //         'Mentor Sign Up',
+            //         style: TextStyle(color: AppTheme.accentColor),
+            //       ),
+            //     ),
+            //   ],
+            // ),
           ],
           ),
         ),

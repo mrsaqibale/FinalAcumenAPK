@@ -1,3 +1,5 @@
+import 'package:flutter/foundation.dart';
+
 class UserModel {
   final String uid;
   final String email;
@@ -10,6 +12,7 @@ class UserModel {
   final String status;
   final bool isApproved;
   final String? document;
+  final bool isActive;
 
   UserModel({
     required this.uid,
@@ -23,6 +26,7 @@ class UserModel {
     required this.status,
     required this.isApproved,
     this.document,
+    this.isActive = true,
   });
 
   bool get isTeacher => role == 'teacher';
@@ -41,22 +45,32 @@ class UserModel {
       'status': status,
       'isApproved': isApproved,
       'document': document,
+      'isActive': isActive,
     };
   }
 
   factory UserModel.fromMap(Map<String, dynamic> map) {
-    return UserModel(
-      uid: map['uid'] as String,
-      email: map['email'] as String,
-      name: map['name'] as String,
-      role: map['role'] as String,
-      employeeId: map['employeeId'] as String?,
-      department: map['department'] as String?,
-      rollNo: map['rollNo'] as int?,
-      isFirstSemester: map['isFirstSemester'] as bool?,
-      status: map['status'] as String,
-      isApproved: map['isApproved'] as bool,
-      document: map['document'] as String?,
-    );
+    try {
+      return UserModel(
+        uid: map['uid']?.toString() ?? '',
+        email: map['email']?.toString() ?? '',
+        name: map['name']?.toString() ?? '',
+        role: map['role']?.toString() ?? 'student',
+        employeeId: map['employeeId']?.toString(),
+        department: map['department']?.toString(),
+        rollNo: map['rollNo'] is int ? map['rollNo'] as int : null,
+        isFirstSemester: map['isFirstSemester'] as bool?,
+        status: map['status']?.toString() ?? 'pending',
+        isApproved: map['isApproved'] as bool? ?? false,
+        document: map['document']?.toString(),
+        isActive: map['isActive'] as bool? ?? true,
+      );
+    } catch (e) {
+      if (kDebugMode) {
+        print('Error creating UserModel from map: $e');
+        print('Map data: $map');
+      }
+      rethrow;
+    }
   }
 } 

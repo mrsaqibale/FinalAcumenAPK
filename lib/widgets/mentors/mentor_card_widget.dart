@@ -28,16 +28,16 @@ class MentorCardWidget extends StatelessWidget {
               imageUrl: mentor.photoUrl,
               size: 48,
               radius: 24,
-              onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => MentorProfileScreen(
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => MentorProfileScreen(
                       mentorId: mentor.id,
-                    ),
-                  ),
-                );
-              },
+                ),
+              ),
+            );
+          },
             ),
             if (!mentor.isActive)
               Positioned(

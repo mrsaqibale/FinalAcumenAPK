@@ -1,11 +1,9 @@
 import 'package:acumen/features/auth/services/signup_service.dart';
 import 'package:acumen/features/auth/widgets/signup_form.dart';
 import 'package:acumen/features/auth/widgets/signup_header.dart';
-import 'package:acumen/routes/app_routes.dart';
 import 'package:acumen/theme/app_theme.dart';
 import 'package:acumen/utils/app_snackbar.dart';
 import 'package:file_picker/file_picker.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 

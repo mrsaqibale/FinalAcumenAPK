@@ -1,4 +1,5 @@
-import '../../../web/screens/messaging/chats_screen.dart';
+import 'package:acumen/features/chat/screens/chats_screen.dart';
+
 import 'package:flutter/material.dart';
 
 

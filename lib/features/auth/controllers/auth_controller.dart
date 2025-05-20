@@ -8,12 +8,11 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:acumen/services/image_cache_service.dart';
-import 'package:acumen/features/chat/services/chat_service.dart';
-import 'package:hive_flutter/hive_flutter.dart';
-import 'package:acumen/utils/app_snackbar.dart';
+import 'dart:io';
+import 'dart:typed_data';
 import 'package:firebase_storage/firebase_storage.dart';
-import 'package:flutter/rendering.dart';
+
+import 'package:acumen/utils/app_snackbar.dart';
 
 class AuthController extends ChangeNotifier {
   final AuthService _authService = AuthService();
@@ -21,6 +20,7 @@ class AuthController extends ChangeNotifier {
   User? _currentUser;
   UserModel? _appUser;
   bool _isLoading = false;
+  final FirebaseStorage _storage = FirebaseStorage.instance;
 
   // Get current user
   User? get currentUser => _currentUser;
@@ -268,14 +268,14 @@ class AuthController extends ChangeNotifier {
     }
   }
 
-  // Signup user
+  // Sign up student
   Future<bool> signUp({
     required String email,
     required String password,
     required String name,
     required String rollNoString,
     required bool isFirstSemester,
-    required PlatformFile? document,
+    required PlatformFile document,
     required BuildContext context,
   }) async {
     try {
@@ -283,7 +283,7 @@ class AuthController extends ChangeNotifier {
       notifyListeners();
 
       if (kDebugMode) {
-        print("AuthController: Starting signup validation");
+        print("AuthController: Starting student signup");
       }
 
       // Validate inputs
@@ -299,55 +299,65 @@ class AuthController extends ChangeNotifier {
         return false;
       }
 
-      final String? nameError = AuthValidation.validateName(name);
-      if (nameError != null) {
-        _showErrorMessage(context, nameError);
+      if (name.trim().isEmpty) {
+        _showErrorMessage(context, 'Name is required');
         return false;
       }
 
-      final String? rollNoError = AuthValidation.validateRollNumber(rollNoString);
+      // Validate roll number format
+      final String? rollNoError = LoginValidation.validateRollNumber(rollNoString);
       if (rollNoError != null) {
         _showErrorMessage(context, rollNoError);
         return false;
       }
 
-      final String? documentError = AuthValidation.validateDocument(document);
-      if (documentError != null) {
-        _showErrorMessage(context, documentError);
+      // Check if roll number is unique
+      final isUnique = await isRollNumberUnique(rollNoString);
+      if (!isUnique) {
+        _showErrorMessage(context, 'This roll number is already registered');
         return false;
       }
 
-      if (document == null) {
-        _showErrorMessage(context, 'Document is required');
-        return false;
-      }
+      // Parse roll number to integer
+      final rollNo = int.parse(rollNoString);
 
       if (kDebugMode) {
-        print("AuthController: All validations passed");
+        print("AuthController: All validations passed, attempting signup");
       }
 
-      final int rollNo = int.parse(rollNoString);
-      
-      // Upload document and get URL
-      final String documentUrl = await _uploadDocument(document);
+      String documentUrl;
+      try {
+        // Upload document to Firebase Storage
+        documentUrl = await _uploadDocument(document);
+      } catch (e) {
+        _showErrorMessage(context, 'Failed to upload document: ${e.toString()}');
+        return false;
+      }
 
-      // Sign up user
-      await _authService.signUp(email, password, name, rollNo, isFirstSemester, documentUrl);
+      // Create user in Firebase Auth and Firestore
+      await _authService.signUp(
+        email.trim(),
+        password,
+        name.trim(),
+        rollNo,
+        isFirstSemester,
+        documentUrl,
+      );
       
       if (kDebugMode) {
         print("AuthController: Signup completed successfully");
       }
       
+      // Send verification email
+      await _authService.sendEmailVerification();
+      
       return true;
-    } on FirebaseAuthException catch (e) {
-      _handleFirebaseAuthException(e, context);
-      return false;
     } catch (e) {
       _showErrorMessage(context, 'Error: ${e.toString()}');
       if (kDebugMode) {
         print("Error during signup: $e");
       }
-      rethrow;
+      return false;
     } finally {
       _isLoading = false;
       notifyListeners();
@@ -474,6 +484,7 @@ class AuthController extends ChangeNotifier {
           'rollNumber': data['rollNo']?.toString() ?? '',
           'email': data['email'] ?? '',
           'role': 'student',
+          'isActive': data['isActive'] ?? true,
         };
       }).toList();
     } catch (e) {
@@ -544,56 +555,33 @@ class AuthController extends ChangeNotifier {
     }
   }
 
-  // Upload document helper
+  // Upload document to Firebase Storage
   Future<String> _uploadDocument(PlatformFile file) async {
     try {
       if (kDebugMode) {
         print("Starting document upload for: ${file.name}");
-        print("File has bytes: ${file.bytes != null}");
-        print("File has path: ${file.path != null}");
       }
 
       final Uint8List fileBytes;
-      
-      // Get file bytes either from memory or from path
       if (file.bytes != null) {
         fileBytes = file.bytes!;
       } else if (file.path != null) {
-        // If we're on mobile, the bytes might be null but the path is available
-        throw Exception('File path handling not implemented. Please use web picker.');
+        fileBytes = await File(file.path!).readAsBytes();
       } else {
         throw Exception('File data is missing. Please try uploading again.');
       }
 
-      final storageRef = FirebaseStorage.instance.ref()
-          .child('user_documents')
+      final ref = _storage.ref()
+          .child('documents')
+          .child('student')
           .child('${DateTime.now().millisecondsSinceEpoch}_${file.name}');
-
-      if (kDebugMode) {
-        print("Upload started to path: ${storageRef.fullPath}");
-      }
       
-      // Upload the file with appropriate content type
-      final uploadTask = await storageRef.putData(
-        fileBytes,
-        SettableMetadata(
-          contentType: _getContentType(file.name),
-          customMetadata: {
-            'fileName': file.name,
-            'fileSize': file.size.toString(),
-            'fileType': file.name.split('.').last.toLowerCase(),
-          },
-        ),
+      final metadata = SettableMetadata(
+        contentType: _getContentType(file.name),
       );
-
-      // Get download URL
-      final downloadUrl = await uploadTask.ref.getDownloadURL();
       
-      if (kDebugMode) {
-        print("Upload completed. Download URL: $downloadUrl");
-      }
-      
-      return downloadUrl;
+      final uploadTask = await ref.putData(fileBytes, metadata);
+      return await uploadTask.ref.getDownloadURL();
     } catch (e) {
       if (kDebugMode) {
         print("Error uploading document: $e");
@@ -675,8 +663,8 @@ class AuthController extends ChangeNotifier {
           code: 'invalid-email',
           message: emailError
         );
-      }
-
+    }
+    
       final String? passwordError = AuthValidation.validatePassword(password);
       if (passwordError != null) {
         throw FirebaseAuthException(
@@ -730,6 +718,48 @@ class AuthController extends ChangeNotifier {
     } catch (e) {
       if (kDebugMode) {
         print("Error checking if user is admin: $e");
+      }
+      return false;
+    }
+  }
+
+  // Reload current user
+  Future<void> reloadUser() async {
+    try {
+      await _authService.reloadUser();
+      // After reloading, update the current user and load user data
+      _currentUser = _authService.currentUser;
+      if (_currentUser != null) {
+        await _loadUserData();
+      }
+      notifyListeners();
+    } catch (e) {
+      if (kDebugMode) {
+        print("Error reloading user in AuthController: $e");
+      }
+      rethrow;
+    }
+  }
+
+  // Check if roll number is unique
+  Future<bool> isRollNumberUnique(String rollNo) async {
+    try {
+      final rollNoInt = int.tryParse(rollNo);
+      if (rollNoInt == null) {
+        return false;
+      }
+      
+      final querySnapshot = await _firestore
+          .collection('users')
+          .where('rollNo', isEqualTo: rollNoInt)
+          .where('role', isEqualTo: 'student')
+          .limit(1)
+          .get();
+      
+      return querySnapshot.docs.isEmpty;
+    } catch (e) {
+      if (kDebugMode) {
+        print("Error checking roll number uniqueness: $e");
       }
       return false;
     }

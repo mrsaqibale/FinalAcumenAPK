@@ -23,16 +23,19 @@ class NotificationCardWidget extends StatelessWidget {
         borderRadius: BorderRadius.circular(15),
       ),
       child: InkWell(
-        onTap: () {
-          if (onMarkAsRead != null) {
-            onMarkAsRead!();
-          }
-          Navigator.push(
+        onTap: () async {
+          // First navigate to the detail screen
+          await Navigator.push(
             context,
             MaterialPageRoute(
               builder: (context) => NotificationDetailScreen(notification: notification),
             ),
           );
+          
+          // Then mark as read if needed
+          if (onMarkAsRead != null && !notification.isRead) {
+            onMarkAsRead!();
+          }
         },
         onLongPress: () {
           _showOptions(context);
@@ -77,6 +80,8 @@ class NotificationCardWidget extends StatelessWidget {
                         fontSize: 14,
                         color: Colors.black87,
                       ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ],
                 ),
@@ -89,34 +94,8 @@ class NotificationCardWidget extends StatelessWidget {
   }
 
   Widget _buildNotificationIcon() {
-    Color iconColor;
-    IconData iconData;
-
-    switch (notification.type) {
-      case 'assignment':
-        iconColor = Colors.orange;
-        iconData = Icons.assignment;
-        break;
-      case 'security':
-        iconColor = Colors.red;
-        iconData = Icons.security;
-        break;
-      case 'announcement':
-        iconColor = Colors.blue;
-        iconData = Icons.campaign;
-        break;
-      case 'account':
-        iconColor = Colors.green;
-        iconData = Icons.person;
-        break;
-      case 'enrollment':
-        iconColor = Colors.purple;
-        iconData = Icons.school;
-        break;
-      default:
-        iconColor = Colors.grey;
-        iconData = Icons.notifications;
-    }
+    final iconColor = NotificationModel.getColorForType(notification.type);
+    final iconData = NotificationModel.getIconForType(notification.type);
 
     return Container(
       width: 40,

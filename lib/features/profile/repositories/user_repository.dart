@@ -66,6 +66,20 @@ class UserRepository {
     }
   }
 
+  // Update mentor approval status
+  Future<bool> updateMentorApprovalStatus(String userId, bool isApproved) async {
+    try {
+      await _firestore.collection(_collection).doc(userId).update({
+        'isApproved': isApproved,
+        'status': isApproved ? 'active' : 'pending_approval'
+      });
+      return true;
+    } catch (e) {
+      print('Error updating mentor approval status: $e');
+      return false;
+    }
+  }
+
   // Approve teacher account
   Future<bool> approveTeacher(String teacherId) async {
     try {

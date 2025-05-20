@@ -17,6 +17,9 @@ import '../features/onboard/screens/onboarding_screen.dart';
 import '../features/dashboard/screens/admin_dashboard_screen.dart';
 import '../features/dashboard/screens/mentor_dashboard_screen.dart';
 import '../features/auth/screens/mentor_approval_screen.dart';
+import '../features/auth/controllers/auth_controller.dart';
+import '../features/settings/screens/settings_screen.dart';
+import 'package:provider/provider.dart';
 
 class AppRoutes {
   // Route names as constants
@@ -35,6 +38,8 @@ class AppRoutes {
   static const String notifications = '/notifications';
   static const String adminDashboard = '/admin-dashboard';
   static const String mentorLogin = '/mentor-login';
+  static const String mentorApproval = '/mentor-approval';
+  static const String settings = '/settings';
 
   // Get all routes
   static Map<String, WidgetBuilder> getRoutes(bool onboardingComplete) {
@@ -53,6 +58,9 @@ class AppRoutes {
       notifications: (context) => const NotificationsScreen(),
       adminDashboard: (context) => const AdminDashboardScreen(),
       mentorLogin: (context) => const MentorLoginScreen(),
+      mentorApproval: (context) => MentorApprovalScreen(email: Provider.of<AuthController>(context, listen: false).currentUser?.email ?? ''),
+      emailConfirmation: (context) => EmailConfirmationScreen(email: Provider.of<AuthController>(context, listen: false).currentUser?.email ?? ''),
+      settings: (context) => const SettingsScreen(),
     };
   }
 

@@ -1,3 +1,5 @@
+import 'package:flutter/material.dart';
+
 class NotificationModel {
   final String id;
   final String title;
@@ -59,5 +61,49 @@ class NotificationModel {
       'type': type,
       'details': details,
     };
+  }
+
+  // Helper method to get notification icon data
+  static IconData getIconForType(String type) {
+    switch (type) {
+      case 'assignment':
+        return Icons.assignment;
+      case 'security':
+        return Icons.security;
+      case 'announcement':
+        return Icons.campaign;
+      case 'account':
+        return Icons.person;
+      case 'enrollment':
+        return Icons.school;
+      case 'event':
+        return Icons.event;
+      case 'message':
+        return Icons.message;
+      default:
+        return Icons.notifications;
+    }
+  }
+
+  // Helper method to get notification icon color
+  static Color getColorForType(String type) {
+    switch (type) {
+      case 'assignment':
+        return Colors.orange;
+      case 'security':
+        return Colors.red;
+      case 'announcement':
+        return Colors.blue;
+      case 'account':
+        return Colors.green;
+      case 'enrollment':
+        return Colors.purple;
+      case 'event':
+        return Colors.amber;
+      case 'message':
+        return Colors.teal;
+      default:
+        return Colors.grey;
+    }
   }
 } 

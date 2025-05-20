@@ -1,15 +1,47 @@
 import 'package:acumen/features/notification/models/notification_model.dart';
+import 'package:acumen/features/chat/screens/chat_detail_screen.dart';
 import 'package:acumen/theme/app_theme.dart';
+import 'package:acumen/features/events/screens/event_notifications_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
+import 'package:intl/intl.dart';
 
-class NotificationDetailScreen extends StatelessWidget {
+class NotificationDetailScreen extends StatefulWidget {
   final NotificationModel notification;
 
   const NotificationDetailScreen({
     super.key,
     required this.notification,
   });
+
+  @override
+  State<NotificationDetailScreen> createState() => _NotificationDetailScreenState();
+}
+
+class _NotificationDetailScreenState extends State<NotificationDetailScreen> {
+  @override
+  void initState() {
+    super.initState();
+    // Any initialization that needs to happen after the widget is built
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      // Any state updates that need to happen after the first frame
+    });
+  }
+
+  void _navigateToChat() {
+    if (widget.notification.type == 'message' && widget.notification.details != null) {
+      final conversationId = widget.notification.details!['conversationId'] as String;
+      
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => ChatDetailScreen(
+            conversationId: conversationId,
+          ),
+        ),
+      );
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -47,9 +79,17 @@ class NotificationDetailScreen extends StatelessWidget {
             _buildHeader(),
             const SizedBox(height: 20),
             _buildContent(),
-            if (notification.details != null) ...[
+            if (widget.notification.details != null) ...[
               const SizedBox(height: 20),
               _buildDetails(),
+            ],
+            if (widget.notification.type == 'event') ...[
+              const SizedBox(height: 20),
+              _buildEventActions(context),
+            ],
+            if (widget.notification.type == 'message') ...[
+              const SizedBox(height: 20),
+              _buildMessageActions(context),
             ],
           ],
         ),
@@ -77,7 +117,7 @@ class NotificationDetailScreen extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        notification.title,
+                        widget.notification.title,
                         style: const TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.bold,
@@ -85,12 +125,25 @@ class NotificationDetailScreen extends StatelessWidget {
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        notification.time,
+                        widget.notification.time,
                         style: TextStyle(
                           fontSize: 14,
                           color: Colors.grey[600],
                         ),
                       ),
+                      if (widget.notification.type == 'event' && 
+                          widget.notification.details != null && 
+                          widget.notification.details!.containsKey('timeMessage')) ...[
+                        const SizedBox(height: 4),
+                        Text(
+                          widget.notification.details!['timeMessage'] as String,
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w500,
+                            color: Colors.amber[700],
+                          ),
+                        ),
+                      ],
                     ],
                   ),
                 ),
@@ -123,7 +176,7 @@ class NotificationDetailScreen extends StatelessWidget {
             ),
             const SizedBox(height: 10),
             Text(
-              notification.message,
+              widget.notification.message,
               style: const TextStyle(
                 fontSize: 16,
                 color: Colors.black87,
@@ -136,6 +189,34 @@ class NotificationDetailScreen extends StatelessWidget {
   }
 
   Widget _buildDetails() {
+    // For event notifications, only show relevant details
+    Map<String, dynamic> displayDetails = Map.from(widget.notification.details!);
+    
+    if (widget.notification.type == 'event') {
+      // Format the dates if they exist
+      if (displayDetails.containsKey('startDate')) {
+        final startDateTime = DateTime.fromMillisecondsSinceEpoch(
+          displayDetails['startDate'] as int
+        );
+        displayDetails['startDate'] = DateFormat('MMM dd, yyyy hh:mm a').format(startDateTime);
+      }
+      
+      if (displayDetails.containsKey('endDate')) {
+        final endDateTime = DateTime.fromMillisecondsSinceEpoch(
+          displayDetails['endDate'] as int
+        );
+        displayDetails['endDate'] = DateFormat('MMM dd, yyyy hh:mm a').format(endDateTime);
+      }
+      
+      // Remove technical fields
+      displayDetails.remove('eventId');
+      displayDetails.remove('timeMessage');
+    }
+    
+    if (displayDetails.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
     return Card(
       elevation: 0,
       shape: RoundedRectangleBorder(
@@ -155,7 +236,7 @@ class NotificationDetailScreen extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 10),
-            ...notification.details!.entries.map((entry) {
+            ...displayDetails.entries.map((entry) {
               return Padding(
                 padding: const EdgeInsets.only(bottom: 8.0),
                 child: Row(
@@ -188,6 +269,84 @@ class NotificationDetailScreen extends StatelessWidget {
     );
   }
 
+  Widget _buildEventActions(BuildContext context) {
+    return Card(
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(15),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Actions',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: Colors.black87,
+              ),
+            ),
+            const SizedBox(height: 10),
+            Center(
+              child: SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const EventNotificationsScreen(),
+                      ),
+                    );
+                  },
+                  icon: const Icon(Icons.calendar_month),
+                  label: const Text('View All Events'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppTheme.primaryColor,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMessageActions(BuildContext context) {
+    return Card(
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(15),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            ElevatedButton.icon(
+              onPressed: _navigateToChat,
+              icon: const Icon(Icons.message),
+              label: const Text('Open Chat'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppTheme.primaryColor,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   String _formatKey(String key) {
     // Convert camelCase or snake_case to Title Case
     final formattedKey = key
@@ -199,34 +358,8 @@ class NotificationDetailScreen extends StatelessWidget {
   }
 
   Widget _buildNotificationIcon() {
-    Color iconColor;
-    IconData iconData;
-
-    switch (notification.type) {
-      case 'assignment':
-        iconColor = Colors.orange;
-        iconData = Icons.assignment;
-        break;
-      case 'security':
-        iconColor = Colors.red;
-        iconData = Icons.security;
-        break;
-      case 'announcement':
-        iconColor = Colors.blue;
-        iconData = Icons.campaign;
-        break;
-      case 'account':
-        iconColor = Colors.green;
-        iconData = Icons.person;
-        break;
-      case 'enrollment':
-        iconColor = Colors.purple;
-        iconData = Icons.school;
-        break;
-      default:
-        iconColor = Colors.grey;
-        iconData = Icons.notifications;
-    }
+    final iconColor = NotificationModel.getColorForType(widget.notification.type);
+    final iconData = NotificationModel.getIconForType(widget.notification.type);
 
     return Container(
       width: 40,

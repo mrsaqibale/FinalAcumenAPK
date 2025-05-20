@@ -1,17 +1,11 @@
 import 'package:acumen/features/auth/controllers/auth_controller.dart';
 import 'package:acumen/features/chat/controllers/chat_controller.dart';
 import 'package:acumen/features/chat/models/conversation_model.dart';
-import 'package:acumen/features/chat/models/conversation_extension.dart';
-import 'package:acumen/features/chat/screens/chat_detail_screen.dart';
 import 'package:acumen/theme/app_theme.dart';
-import 'package:acumen/widgets/chat/chat_card_widget.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:acumen/utils/app_snackbar.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import '../../../theme/app_theme.dart';
-import '../../features/chat/controllers/chat_controller.dart';
-import '../../features/chat/models/conversation_model.dart';
 import '../../features/chat/screens/community_chat_screen.dart';
 
 class CommunityChatsWidget extends StatefulWidget {
@@ -21,18 +15,48 @@ class CommunityChatsWidget extends StatefulWidget {
   State<CommunityChatsWidget> createState() => _CommunityChatsWidgetState();
 }
 
-class _CommunityChatsWidgetState extends State<CommunityChatsWidget> {
+class _CommunityChatsWidgetState extends State<CommunityChatsWidget> with SingleTickerProviderStateMixin {
   String? selectedConversationId;
-  bool _showJoinableCommunities = false;
+  late TabController _tabController;
+  bool _isLoading = false;
+  List<ConversationModel> _availableCommunities = [];
 
   @override
   void initState() {
     super.initState();
-    // Load available communities that user can join
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      final chatController = Provider.of<ChatController>(context, listen: false);
-      chatController.fetchAvailableCommunities();
+    _tabController = TabController(length: 2, vsync: this);
+    _fetchAvailableCommunities();
+  }
+
+  @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _fetchAvailableCommunities() async {
+    setState(() {
+      _isLoading = true;
     });
+
+    try {
+      final chatController = Provider.of<ChatController>(context, listen: false);
+      await chatController.fetchAvailableCommunities();
+      _availableCommunities = chatController.availableCommunities;
+    } catch (e) {
+      if (mounted) {
+        AppSnackbar.showError(
+          context: context,
+          message: 'Failed to load communities: $e',
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
   }
 
   void _showDeleteOptions(String conversationId, ConversationModel conversation) {
@@ -289,178 +313,167 @@ class _CommunityChatsWidgetState extends State<CommunityChatsWidget> {
       );
       
       setState(() {
-        _showJoinableCommunities = false;
+        _availableCommunities = [];
       });
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    return Consumer<ChatController>(
-      builder: (context, chatController, child) {
-        if (chatController.isLoading) {
+    return Column(
+      children: [
+        TabBar(
+          controller: _tabController,
+          tabs: const [
+            Tab(text: 'MY COMMUNITIES'),
+            Tab(text: 'AVAILABLE COMMUNITIES'),
+          ],
+          labelColor: Colors.black,
+          indicatorColor: Colors.black,
+          unselectedLabelColor: Colors.grey,
+          indicator: const UnderlineTabIndicator(
+            borderSide: BorderSide(color: Colors.black, width: 2.0),
+            insets: EdgeInsets.symmetric(horizontal: 10.0),
+          ),
+        ),
+        Expanded(
+          child: TabBarView(
+            controller: _tabController,
+            children: [
+              _buildMyCommunities(),
+              _buildAvailableCommunities(),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildMyCommunities() {
+    return StreamBuilder<List<Map<String, dynamic>>>(
+      stream: Provider.of<ChatController>(context).getUserCommunitiesStream(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
           return const Center(child: CircularProgressIndicator());
         }
+
+        if (snapshot.hasError) {
+          return Center(child: Text('Error: ${snapshot.error}'));
+        }
+
+        final communities = snapshot.data ?? [];
         
-        return Column(
-          children: [
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              child: Row(
-                children: [
-                  Text(
-                    _showJoinableCommunities ? 'Available Communities' : 'My Communities',
-                    style: const TextStyle(
-                fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                    ),
+        if (communities.isEmpty) {
+          return const Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  Icons.group_off,
+                  size: 64,
+                  color: Colors.grey,
+                ),
+                SizedBox(height: 16),
+                Text(
+                  'No communities yet',
+                  style: TextStyle(
+                    fontSize: 18,
+                    color: Colors.grey,
                   ),
-                  const Spacer(),
-                  TextButton.icon(
-                    onPressed: () {
-                      setState(() {
-                        _showJoinableCommunities = !_showJoinableCommunities;
-                      });
-                    },
-                    icon: Icon(
-                      _showJoinableCommunities ? Icons.group : Icons.group_add,
-                      color: AppTheme.primaryColor,
-                    ),
-                    label: Text(
-                      _showJoinableCommunities ? 'My Communities' : 'Join Communities',
-                      style: TextStyle(color: AppTheme.primaryColor),
-                    ),
+                ),
+                SizedBox(height: 8),
+                Text(
+                  'Join a community or create a new one',
+                  style: TextStyle(
+                    color: Colors.grey,
                   ),
-                ],
-              ),
-            ),
-            Expanded(
-              child: _showJoinableCommunities
-                  ? _buildAvailableCommunities(chatController.availableCommunities)
-                  : StreamBuilder<List<Map<String, dynamic>>>(
-                      stream: chatController.getUserCommunitiesStream(),
-                      builder: (context, snapshot) {
-                        if (snapshot.connectionState == ConnectionState.waiting) {
-                          return const Center(child: CircularProgressIndicator());
-                        }
-
-                        if (snapshot.hasError) {
-                          return Center(child: Text('Error: ${snapshot.error}'));
-                        }
-
-                        final communities = snapshot.data ?? [];
-                        
-                        if (communities.isEmpty) {
-                          return const Center(
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Icon(
-                                  Icons.group_off,
-                                  size: 64,
-                                  color: Colors.grey,
-              ),
-                                SizedBox(height: 16),
-                                Text(
-                                  'No communities yet',
-                                  style: TextStyle(
-                                    fontSize: 18,
-                                    color: Colors.grey,
-                                  ),
-                                ),
-                                SizedBox(height: 8),
-                                Text(
-                                  'Join a community or create a new one',
-                                  style: TextStyle(
-                                    color: Colors.grey,
-                                  ),
-                                ),
-                              ],
+                ),
+              ],
             ),
           );
         }
         
         return ListView.builder(
-                          padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
-                          itemCount: communities.length,
+          padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
+          itemCount: communities.length,
           itemBuilder: (context, index) {
-                            final community = communities[index];
-                            final isSelected = selectedConversationId == community['id'];
-                            final isMentorOnly = (community['description'] as String?)?.contains('mentor-only') ?? false;
-                            
-                            final conversationModel = ConversationModel(
-                              id: community['id'] as String,
-                              name: community['name'] as String,
-                              description: community['description'] as String?,
-                              members: (community['members'] as List<dynamic>).cast<String>(),
-                              createdBy: community['createdBy'] as String,
-                              createdAt: (community['createdAt'] as Timestamp).toDate(),
-                              lastMessageAt: (community['lastMessageAt'] as Timestamp).toDate(),
-                              isGroup: true,
-                              unreadCount: (community['unreadCount'] as int?) ?? 0,
-                              lastMessage: community['lastMessage'] as String?,
-                              lastMessageSender: community['lastMessageSender'] as String?,
-                              imageUrl: community['imageUrl'] as String?,
-                            );
+            final community = communities[index];
+            final isSelected = selectedConversationId == community['id'];
+            final isMentorOnly = (community['description'] as String?)?.contains('mentor-only') ?? false;
+            
+            final conversationModel = ConversationModel(
+              id: community['id'] as String,
+              name: community['name'] as String,
+              description: community['description'] as String?,
+              members: (community['members'] as List<dynamic>).cast<String>(),
+              createdBy: community['createdBy'] as String,
+              createdAt: (community['createdAt'] as Timestamp).toDate(),
+              lastMessageAt: (community['lastMessageAt'] as Timestamp).toDate(),
+              isGroup: true,
+              unreadCount: (community['unreadCount'] as int?) ?? 0,
+              lastMessage: community['lastMessage'] as String?,
+              lastMessageSender: community['lastMessageSender'] as String?,
+              imageUrl: community['imageUrl'] as String?,
+            );
             
             return InkWell(
-                              onLongPress: () => _showDeleteOptions(community['id'], conversationModel),
+              onLongPress: () => _showDeleteOptions(community['id'], conversationModel),
               child: Container(
                 color: isSelected ? Colors.grey.withOpacity(0.1) : Colors.transparent,
-                                child: ListTile(
-                                  leading: CircleAvatar(
-                                    backgroundColor: AppTheme.primaryColor,
-                                    child: Text(
-                                      (community['name'] as String).substring(0, 1).toUpperCase(),
-                                    ),
-                                  ),
-                                  title: Row(
-                                    children: [
-                                      Expanded(child: Text(community['name'] as String)),
-                                      if (isMentorOnly)
-                                        Container(
-                                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                          decoration: BoxDecoration(
-                                            color: AppTheme.primaryColor.withOpacity(0.1),
-                                            borderRadius: BorderRadius.circular(4),
-                                          ),
-                                          child: Text(
-                                            'Mentor',
-                                            style: TextStyle(
-                                              fontSize: 10,
-                                              color: AppTheme.primaryColor,
-                                              fontWeight: FontWeight.bold,
-                                            ),
-                                          ),
-                                        ),
-                                    ],
-                                  ),
-                                  subtitle: Text(community['lastMessage'] as String? ?? 'No messages yet'),
-                                  trailing: community['unreadCount'] != null && (community['unreadCount'] as int) > 0
-                                    ? Container(
-                                        padding: const EdgeInsets.all(6),
-                                        decoration: BoxDecoration(
-                                          color: AppTheme.primaryColor,
-                                          shape: BoxShape.circle,
-                                        ),
-                                        child: Text(
-                                          '${community['unreadCount']}',
-                                          style: const TextStyle(
-                                            color: Colors.white,
-                                            fontSize: 12,
-                                          ),
-                                        ),
-                                      )
-                                    : null,
+                child: ListTile(
+                  leading: CircleAvatar(
+                    backgroundColor: AppTheme.primaryColor,
+                    child: Text(
+                      (community['name'] as String).substring(0, 1).toUpperCase(),
+                    ),
+                  ),
+                  title: Row(
+                    children: [
+                      Expanded(child: Text(community['name'] as String)),
+                      if (isMentorOnly)
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: AppTheme.primaryColor.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Text(
+                            'Mentor',
+                            style: TextStyle(
+                              fontSize: 10,
+                              color: AppTheme.primaryColor,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                  subtitle: Text(community['lastMessage'] as String? ?? 'No messages yet'),
+                  trailing: community['unreadCount'] != null && (community['unreadCount'] as int) > 0
+                    ? Container(
+                        padding: const EdgeInsets.all(6),
+                        decoration: BoxDecoration(
+                          color: AppTheme.primaryColor,
+                          shape: BoxShape.circle,
+                        ),
+                        child: Text(
+                          '${community['unreadCount']}',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 12,
+                          ),
+                        ),
+                      )
+                    : null,
                   onTap: () {
                     Navigator.push(
                       context,
                       MaterialPageRoute(
-                                        builder: (context) => CommunityChatScreen(
-                                          communityId: community['id'] as String,
-                                          communityName: community['name'] as String,
-                                          memberIds: (community['members'] as List<dynamic>).cast<String>(),
-                                          imageUrl: community['imageUrl'] as String?,
+                        builder: (context) => CommunityChatScreen(
+                          communityId: community['id'] as String,
+                          communityName: community['name'] as String,
+                          memberIds: (community['members'] as List<dynamic>).cast<String>(),
+                          imageUrl: community['imageUrl'] as String?,
                         ),
                       ),
                     );
@@ -469,25 +482,48 @@ class _CommunityChatsWidgetState extends State<CommunityChatsWidget> {
               ),
             );
           },
-                        );
-                      },
-                    ),
-            ),
-          ],
         );
       },
     );
   }
 
-  Widget _buildAvailableCommunities(List<ConversationModel> communities) {
+  Widget _buildAvailableCommunities() {
+    final chatController = Provider.of<ChatController>(context);
+    final communities = chatController.availableCommunities;
+    
+    if (_isLoading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    
     if (communities.isEmpty) {
-      return const Center(
-        child: Text(
-          'No available communities to join',
-          style: TextStyle(
-            fontSize: 16,
-            color: Colors.grey,
-          ),
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(
+              Icons.group_off,
+              size: 64,
+              color: Colors.grey,
+            ),
+            const SizedBox(height: 16),
+            const Text(
+              'No available communities to join',
+              style: TextStyle(
+                fontSize: 18,
+                color: Colors.grey,
+              ),
+            ),
+            const SizedBox(height: 16),
+            ElevatedButton.icon(
+              onPressed: _fetchAvailableCommunities,
+              icon: const Icon(Icons.refresh),
+              label: const Text('Refresh'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppTheme.primaryColor,
+                foregroundColor: Colors.white,
+              ),
+            ),
+          ],
         ),
       );
     }
@@ -501,6 +537,13 @@ class _CommunityChatsWidgetState extends State<CommunityChatsWidget> {
         return Card(
           margin: const EdgeInsets.symmetric(vertical: 4),
           child: ListTile(
+            leading: CircleAvatar(
+              backgroundColor: AppTheme.primaryColor,
+              child: Text(
+                community.name.substring(0, 1).toUpperCase(),
+                style: const TextStyle(color: Colors.white),
+              ),
+            ),
             title: Text(community.name),
             subtitle: Text(community.description ?? 'No description'),
             trailing: ElevatedButton(

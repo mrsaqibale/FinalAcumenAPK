@@ -1,14 +1,36 @@
-export 'admin_dashboard_screen.dart';
-import 'package:acumen/theme/app_theme.dart';
 import 'package:flutter/material.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:provider/provider.dart';
+import 'package:acumen/theme/app_theme.dart';
 import 'package:acumen/features/profile/controllers/user_controller.dart';
-import 'package:acumen/features/profile/models/user_model.dart';
 import 'package:acumen/features/profile/widgets/user_form.dart';
-import 'package:acumen/widgets/cached_profile_image.dart';
-import 'package:acumen/widgets/admin/mentor_applications_list.dart';
+import 'package:acumen/features/dashboard/widgets/admin/admin_user_list.dart';
+import 'package:acumen/features/dashboard/widgets/admin/admin_mentor_list.dart';
+import 'package:acumen/features/dashboard/widgets/logout_dialog_widget.dart';
+import 'package:acumen/features/events/screens/admin_events_screen.dart';
+import 'package:acumen/features/events/controllers/event_controller.dart';
+import 'package:acumen/features/events/models/event_model.dart';
+import 'package:acumen/features/events/widgets/add_event_form.dart';
+import 'package:acumen/features/events/widgets/admin/admin_delete_event_dialog.dart';
+import 'package:acumen/features/events/widgets/admin/admin_event_details_dialog.dart';
+import 'package:acumen/features/events/widgets/admin/admin_event_list.dart';
 import 'package:flutter/foundation.dart';
+import 'package:acumen/features/events/screens/add_event_screen.dart';
+import 'package:acumen/features/business/screens/quiz_results_tab.dart';
+import 'package:acumen/features/business/controllers/quiz_controller.dart';
+
+// New wrapper widget for QuizResultsTab to handle provider properly
+class QuizResultsWrapper extends StatelessWidget {
+  const QuizResultsWrapper({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return ChangeNotifierProvider(
+      create: (_) => QuizController.getInstance(),
+      child: const QuizResultsTab(),
+    );
+  }
+}
 
 class AdminDashboardScreen extends StatefulWidget {
   const AdminDashboardScreen({super.key});
@@ -17,47 +39,136 @@ class AdminDashboardScreen extends StatefulWidget {
   State<AdminDashboardScreen> createState() => _AdminDashboardScreenState();
 }
 
-class _AdminDashboardScreenState extends State<AdminDashboardScreen> with SingleTickerProviderStateMixin {
-  late TabController _tabController;
+class _AdminDashboardScreenState extends State<AdminDashboardScreen> with TickerProviderStateMixin {
   bool _isLoading = true;
+  late TabController _tabController;
+  late TabController _eventsTabController;
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
-    _tabController.addListener(() {
-      if (_tabController.indexIsChanging) {
-        setState(() {});
+    _tabController = TabController(length: 4, vsync: this);
+    _eventsTabController = TabController(length: 2, vsync: this);
+    
+    // Use addPostFrameCallback to ensure state updates happen after build
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        _loadUsers();
+        _loadEvents();
       }
     });
-    
-    // Load users data
-    _loadUsers();
-  }
-
-  Future<void> _loadUsers() async {
-    try {
-      final userController = Provider.of<UserController>(context, listen: false);
-      await userController.loadAllUsers();
-      
-      // Log the number of pending applications for debugging
-      if (kDebugMode) {
-        print("Pending teacher applications: ${userController.pendingTeacherApplications.length}");
-        for (var teacher in userController.pendingTeacherApplications) {
-          print("Pending teacher: ${teacher.name}, status: ${teacher.status}, approved: ${teacher.isApproved}");
-        }
-      }
-    } finally {
-      setState(() {
-        _isLoading = false;
-      });
-    }
   }
 
   @override
   void dispose() {
     _tabController.dispose();
+    _eventsTabController.dispose();
     super.dispose();
+  }
+
+  Future<void> _loadUsers() async {
+    if (!mounted) return;
+    
+    try {
+      final userController = Provider.of<UserController>(context, listen: false);
+      await userController.loadAllUsers();
+      
+      if (kDebugMode) {
+        print("Pending mentor applications: ${userController.pendingTeacherApplications.length}");
+        for (var mentor in userController.pendingTeacherApplications) {
+          print("Pending mentor: ${mentor.name}, status: ${mentor.status}, approved: ${mentor.isApproved}");
+        }
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        print("Error loading users: $e");
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _loadEvents() async {
+    if (!mounted) return;
+    
+    try {
+      final eventController = Provider.of<EventController>(context, listen: false);
+      await eventController.loadEvents();
+      
+      // Check for expired events
+      await eventController.checkForExpiredEvents(context);
+    } catch (e) {
+      if (kDebugMode) {
+        print("Error loading events: $e");
+      }
+    }
+  }
+
+  String _getRoleForCurrentTab() {
+    switch (_tabController.index) {
+      case 0:
+        return 'admin';
+      case 1:
+        return 'mentor';
+      case 2:
+        return 'student';
+      case 3:
+        return ''; // Events tab
+      default:
+        return 'student';
+    }
+  }
+
+  void _showAddEventDialog() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => const AddEventScreen(),
+      ),
+    ).then((_) => _loadEvents());
+  }
+
+  void _showEventDetails(EventModel event) {
+    showDialog(
+      context: context,
+      builder: (context) => AdminEventDetailsDialog(
+        event: event,
+        onEdit: () => _showEditEventDialog(event),
+        onDelete: () => _showDeleteEventConfirmation(event),
+      ),
+    );
+  }
+
+  void _showEditEventDialog(EventModel event) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => AddEventScreen(eventToEdit: event),
+      ),
+    ).then((_) => _loadEvents());
+  }
+
+  void _showDeleteEventConfirmation(EventModel event) {
+    showDialog(
+      context: context,
+      builder: (context) => AdminDeleteEventDialog(
+        event: event,
+        onConfirm: () async {
+          final eventController = Provider.of<EventController>(context, listen: false);
+          await eventController.deleteEvent(event.id);
+          
+          if (context.mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Event deleted successfully')),
+            );
+          }
+        },
+      ),
+    );
   }
 
   @override
@@ -67,15 +178,12 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
       appBar: AppBar(
         backgroundColor: AppTheme.primaryColor,
         elevation: 0,
-        
-        title: Padding(
-          padding: const EdgeInsets.only(top: 0),
+        title: const Padding(
+          padding: EdgeInsets.only(top: 0),
           child: Column(
-            
             children: [
-          const SizedBox(height: 12),
-
-              const Text(
+              SizedBox(height: 12),
+              Text(
                 'Admin',
                 style: TextStyle(
                   color: Colors.white,
@@ -83,7 +191,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
                   fontSize: 22,
                 ),
               ),
-              const Text(
+              Text(
                 'Dashboard',
                 style: TextStyle(
                   color: Colors.white,
@@ -96,51 +204,43 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
         ),
         centerTitle: true,
         leading: IconButton(
-          icon: const Icon(FontAwesomeIcons.angleLeft, color: Colors.white),
-          onPressed: () => Navigator.pop(context),
+          icon: const Icon(FontAwesomeIcons.rightFromBracket, color: Colors.white),
+          onPressed: () => LogoutDialogWidget.show(context),
         ),
       ),
-      body: Stack(
-        children: [
-          // Blue background
-          Container(
-            color: AppTheme.primaryColor,
-            height: double.infinity,
-          ),
-          
-          Column(
+      body: _isLoading 
+        ? const Center(child: CircularProgressIndicator(color: Colors.white))
+        : Column(
             children: [
-              // Tab bar 
+              // Tab bar
               Container(
                 color: AppTheme.primaryColor,
-                child: Column(
-                  children: [
-                    TabBar(
-                      controller: _tabController,
-                      isScrollable: false,
-                      labelColor: Colors.white,
-                      unselectedLabelColor: Colors.white.withAlpha(179),
-                      indicatorColor: Colors.white,
-                      indicatorWeight: 2.0,
-                      indicatorSize: TabBarIndicatorSize.tab,
-                      indicator: const UnderlineTabIndicator(
-                        borderSide: BorderSide(color: Colors.white, width: 2.0),
-                        insets: EdgeInsets.symmetric(horizontal: 10.0),
-                      ),
-                      dividerHeight: 0,
-                      dividerColor: Colors.transparent,
-                      tabs: const [
-                        Tab(text: 'Admins'),
-                        Tab(text: 'Mentors'),
-                        Tab(text: 'Students'),
-                      ],
-                    ),
-                    const SizedBox(height: 15), // Space after tabs
+                width: double.infinity,
+                child: TabBar(
+                  controller: _tabController,
+                  isScrollable: true,
+                  labelColor: Colors.white,
+                  unselectedLabelColor: Colors.white.withAlpha(179),
+                  indicatorColor: Colors.white,
+                  indicatorWeight: 2.0,
+                  indicatorSize: TabBarIndicatorSize.tab,
+                  indicator: const UnderlineTabIndicator(
+                    borderSide: BorderSide(color: Colors.white, width: 2.0),
+                    insets: EdgeInsets.symmetric(horizontal: 10.0),
+                  ),
+                  dividerHeight: 0,
+                  dividerColor: Colors.transparent,
+                  tabs: const [
+                    Tab(text: 'Admins'),
+                    Tab(text: 'Mentors'),
+                    Tab(text: 'Students'),
+                    Tab(text: 'Events'),
                   ],
                 ),
               ),
+              const SizedBox(height: 15),
               
-              // Remaining space
+              // Tab content
               Expanded(
                 child: Container(
                   decoration: const BoxDecoration(
@@ -155,296 +255,100 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
                       topLeft: Radius.circular(30),
                       topRight: Radius.circular(30),
                     ),
-                    child: _isLoading 
-                    ? const Center(child: CircularProgressIndicator())
-                    : Consumer<UserController>(
-                        builder: (context, userController, child) {
-                          return TabBarView(
-                            controller: _tabController,
-                            children: [
-                              _buildUserList(userController.admins, 'admin'),
-                              _buildMentorsWithTeacherApplications(userController),
-                              _buildUserList(userController.students, 'student'),
-                            ],
-                          );
-                        },
-                      ),
+                    child: Consumer<UserController>(
+                      builder: (context, userController, child) {
+                        return TabBarView(
+                          controller: _tabController,
+                          children: [
+                            AdminUserList(users: userController.admins, role: 'admin'),
+                            AdminMentorList(userController: userController),
+                            AdminUserList(users: userController.students, role: 'student'),
+                            // Events Tab - now shows content directly
+                            Column(
+                              children: [
+                                // Events sub-tab bar
+                                Container(
+                                  color: Colors.white,
+                                  width: double.infinity,
+                                  child: TabBar(
+                                    controller: _eventsTabController,
+                                    isScrollable: false,
+                                    labelColor: AppTheme.primaryColor,
+                                    unselectedLabelColor: Colors.grey,
+                                    indicatorColor: AppTheme.primaryColor,
+                                    tabs: const [
+                                      Tab(text: 'Running Events'),
+                                      Tab(text: 'Past Events'),
+                                    ],
+                                  ),
+                                ),
+                                
+                                // Events sub-tab content
+                                Expanded(
+                                  child: Consumer<EventController>(
+                                    builder: (context, eventController, child) {
+                                      return TabBarView(
+                                        controller: _eventsTabController,
+                                        children: [
+                                          // Active events tab
+                                          AdminEventList(
+                                            events: eventController.activeEvents,
+                                            emptyTitle: 'No active events',
+                                            emptySubtitle: 'Create an event by tapping the + button below',
+                                            onRefresh: _loadEvents,
+                                            onEventTap: _showEventDetails,
+                                          ),
+                                          
+                                          // Past events tab
+                                          AdminEventList(
+                                            events: eventController.pastEvents,
+                                            emptyTitle: 'No past events',
+                                            emptySubtitle: 'Past events and inactive events will appear here',
+                                            onRefresh: _loadEvents,
+                                            onEventTap: _showEventDetails,
+                                          ),
+                                        ],
+                                      );
+                                    },
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        );
+                      },
+                    ),
                   ),
                 ),
               ),
             ],
           ),
-        ],
-      ),
       floatingActionButton: FloatingActionButton(
         onPressed: () {
-          // Open user form based on current tab
-          String role = 'student';
-          switch (_tabController.index) {
-            case 0:
-              role = 'admin';
-              break;
-            case 1:
-              role = 'mentor';
-              break;
-            case 2:
-              role = 'student';
-              break;
+          if (_tabController.index == 3) {
+            _showAddEventDialog();
+          } else {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => UserForm(role: _getRoleForCurrentTab()),
+              ),
+            );
           }
-          
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => UserForm(role: role),
-            ),
-          );
         },
         backgroundColor: AppTheme.primaryColor,
-        child: const Icon(Icons.add, color: Colors.white),
-      ),
-    );
-  }
-
-  Widget _buildUserList(List<UserModel> users, String role) {
-    if (users.isEmpty) {
-      return Center(child: Text('No $role users found'));
-    }
-    
-    return RefreshIndicator(
-      onRefresh: () async {
-        await Provider.of<UserController>(context, listen: false).loadUsersByRole(role);
-      },
-      child: ListView.builder(
-        padding: const EdgeInsets.all(16),
-        itemCount: users.length,
-        physics: const BouncingScrollPhysics(),
-        itemBuilder: (context, index) {
-          final user = users[index];
-          final bool isPendingApproval = (role == 'teacher' || role == 'mentor') && 
-              user.status == 'pending_approval' && 
-              !(user.isApproved ?? false);
-          
-          return Container(
-            margin: const EdgeInsets.only(bottom: 12),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(16),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withAlpha(13),
-                  blurRadius: 4,
-                  offset: const Offset(0, 2),
-                ),
-              ],
-            ),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-              child: Column(
-                children: [
-                  Row(
-                    children: [
-                      // User avatar
-                      _buildUserAvatar(user),
-                      const SizedBox(width: 16),
-                      // User info
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              user.name,
-                              style: const TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                            Text(
-                              user.email,
-                              style: TextStyle(
-                                fontSize: 14,
-                                color: Colors.grey[600],
-                              ),
-                            ),
-                            if (isPendingApproval)
-                              Container(
-                                margin: const EdgeInsets.only(top: 5),
-                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                                decoration: BoxDecoration(
-                                  color: Colors.orange.withOpacity(0.2),
-                                  borderRadius: BorderRadius.circular(10),
-                                ),
-                                child: const Text(
-                                  'Pending Approval',
-                                  style: TextStyle(
-                                    color: Colors.orange,
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                              ),
-                          ],
-                        ),
-                      ),
-                      // Active/Inactive switch and Approval button
-                      Column(
-                        children: [
-                          // Active/Inactive switch
-                          Switch(
-                            value: user.isActive,
-                            onChanged: (value) {
-                              Provider.of<UserController>(context, listen: false)
-                                  .updateUserActiveStatus(user, value);
-                            },
-                            activeColor: Colors.white,
-                            activeTrackColor: AppTheme.primaryColor,
-                            inactiveThumbColor: Colors.white,
-                            inactiveTrackColor: Colors.grey[300],
-                          ),
-                          Text(
-                            user.isActive ? 'Active' : 'Inactive',
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: user.isActive ? AppTheme.primaryColor : Colors.grey,
-                            ),
-                          ),
-                          // Approval button for mentors
-                          if (role == 'mentor' && user.isApproved == false)
-                            Padding(
-                              padding: const EdgeInsets.only(top: 8),
-                              child: ElevatedButton(
-                                onPressed: () => _showApprovalConfirmation(user),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: AppTheme.primaryColor,
-                                  foregroundColor: Colors.white,
-                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                                  minimumSize: const Size(80, 30),
-                                  textStyle: const TextStyle(fontSize: 12),
-                                ),
-                                child: const Text('Approve'),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                  
-                  // Approval button for pending teachers
-                  if (role == 'teacher' && isPendingApproval)
-                    Padding(
-                      padding: const EdgeInsets.only(top: 10),
-                      child: ElevatedButton(
-                        onPressed: () => _showApprovalConfirmation(user),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: AppTheme.primaryColor,
-                          foregroundColor: Colors.white,
-                          minimumSize: const Size(double.infinity, 40),
-                        ),
-                        child: const Text('Approve Teacher Account'),
-                      ),
-                    ),
-                ],
-              ),
-            ),
-          );
-        },
-      ),
-    );
-  }
-
-  void _showApprovalConfirmation(UserModel user) {
-    final role = user.role == 'mentor' ? 'mentor' : 'teacher';
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text('Approve ${role.capitalize()} Account'),
-        content: Text('Are you sure you want to approve ${user.name} as a $role?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('CANCEL'),
-          ),
-          TextButton(
-            onPressed: () {
-              Navigator.pop(context);
-              Provider.of<UserController>(context, listen: false)
-                  .approveTeacherAccount(user);
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text('${user.name} has been approved as a $role')),
-              );
-            },
-            child: const Text('APPROVE', style: TextStyle(color: Colors.green)),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildUserAvatar(UserModel user) {
-    return CachedProfileImage(
-      imageUrl: user.photoUrl,
-      size: 40,
-      radius: 20,
-      backgroundColor: user.photoUrl == null 
-          ? AppTheme.primaryColor.withOpacity(0.2)
-          : Colors.white,
-      placeholderIcon: FontAwesomeIcons.user,
-      placeholderSize: 20,
-      placeholderColor: AppTheme.primaryColor,
-    );
-  }
-
-  Widget _buildMentorsWithTeacherApplications(UserController userController) {
-    final pendingApplications = userController.pendingTeacherApplications;
-    
-    return DefaultTabController(
-      length: 2,
-      child: Column(
-        children: [
-          Container(
-            color: Colors.white,
-            child: TabBar(
-              labelColor: AppTheme.primaryColor,
-              unselectedLabelColor: Colors.grey,
-              indicatorColor: AppTheme.primaryColor,
-              tabs: [
-                const Tab(text: 'Mentors'),
-                Tab(
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Text('Mentor Applications'),
-                      if (pendingApplications.isNotEmpty)
-                        Container(
-                          margin: const EdgeInsets.only(left: 5),
-                          padding: const EdgeInsets.all(6),
-                          decoration: const BoxDecoration(
-                            color: Colors.red,
-                            shape: BoxShape.circle,
-                          ),
-                          child: Text(
-                            pendingApplications.length.toString(),
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 10,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-          Expanded(
-            child: TabBarView(
-              children: [
-                _buildUserList(userController.mentors, 'mentor'),
-                const MentorApplicationsList(),
-              ],
-            ),
-          ),
-        ],
+        tooltip: _tabController.index == 3 ? 'Add Event' : 
+                _getRoleForCurrentTab().isEmpty ? 'Add' : 'Add ${_getRoleForCurrentTab().capitalize()}',
+        child: Icon(
+          _tabController.index == 0 
+              ? Icons.admin_panel_settings 
+              : _tabController.index == 1 
+                  ? Icons.school 
+                  : _tabController.index == 2
+                      ? Icons.person_add
+                      : Icons.add,
+          color: Colors.white
+        ),
       ),
     );
   }

@@ -1,11 +1,10 @@
 import 'package:acumen/features/auth/screens/login_screen.dart';
 import 'package:acumen/features/auth/controllers/auth_controller.dart';
-import 'package:acumen/features/chat/screens/chats_screen.dart';
 import 'package:acumen/features/notification/screens/notifications_screen.dart';
 import 'package:acumen/features/profile/screens/edit_profile_screen.dart';
+import 'package:acumen/features/profile/screens/mentors_screen.dart';
 import 'package:acumen/features/profile/screens/new_user_profile_screen.dart';
 import 'package:acumen/features/profile/screens/settings_screen.dart';
-import 'package:acumen/features/dashboard/screens/admin_dashboard_screen.dart';
 import 'package:acumen/features/dashboard/utils/dashboard_utils.dart';
 import 'package:acumen/features/dashboard/utils/loading_dialog.dart';
 import 'package:acumen/theme/app_theme.dart';
@@ -171,24 +170,12 @@ class DashboardDrawer extends StatelessWidget {
               Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (context) => const ChatsScreen(),
+                  builder: (context) => const MentorsScreen(),
                 ),
               );
             },
           ),
-          ListTile(
-            leading: const Icon(FontAwesomeIcons.userShield, color: AppTheme.primaryColor, size: 20),
-            title: const Text('Admin Dashboard'),
-            onTap: () {
-              Navigator.pop(context);
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const AdminDashboardScreen(),
-                ),
-              );
-            },
-          ),
+          
           const Divider(),
           ListTile(
             leading: const Icon(FontAwesomeIcons.gear, color: AppTheme.primaryColor, size: 20),

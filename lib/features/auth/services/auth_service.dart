@@ -5,6 +5,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
 import 'dart:typed_data';
 import 'package:acumen/models/user_model.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 
 class AuthService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
@@ -13,10 +14,18 @@ class AuthService {
 
   // Constructor to set persistence
   AuthService() {
-    // Set persistence to LOCAL to maintain user session across app restarts
-    _auth.setPersistence(Persistence.LOCAL);
-    if (kDebugMode) {
-      print("Auth service initialized with LOCAL persistence");
+    // Set persistence for both web and mobile platforms
+    if (kIsWeb) {
+      _auth.setPersistence(Persistence.LOCAL);
+      if (kDebugMode) {
+        print("Auth service initialized with LOCAL persistence (Web platform)");
+      }
+    } else {
+      // For mobile platforms, Firebase Auth automatically persists the auth state
+      // We just need to ensure we're not clearing it
+      if (kDebugMode) {
+        print("Auth service initialized (Mobile platform - persistence enabled by default)");
+      }
     }
   }
 
@@ -28,17 +37,52 @@ class AuthService {
 
   // Reload current user to get updated properties
   Future<void> reloadUser() async {
-    await _auth.currentUser?.reload();
+    try {
+      await _auth.currentUser?.reload();
+      if (kDebugMode) {
+        print("User reloaded successfully");
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        print("Error reloading user: $e");
+      }
+      rethrow;
+    }
   }
 
-  // Sign in user
+  // Sign in user with persistence
   Future<UserCredential?> signIn(String email, String password) async {
     try {
-      return await _auth.signInWithEmailAndPassword(
+      final userCredential = await _auth.signInWithEmailAndPassword(
         email: email,
         password: password,
       );
+      
+      // Ensure persistence is set
+      if (kIsWeb) {
+        await _auth.setPersistence(Persistence.LOCAL);
+      }
+      
+      // Check if user is active
+      final userData = await getUserData(userCredential.user!.uid);
+      if (userData != null && !userData.isActive) {
+        // User is inactive, throw exception
+        await _auth.signOut(); // Sign them out immediately
+        throw FirebaseAuthException(
+          code: 'user-disabled',
+          message: 'Your account has been deactivated. Please contact an administrator.',
+        );
+      }
+      
+      if (kDebugMode) {
+        print("User signed in successfully: ${userCredential.user?.email}");
+      }
+      
+      return userCredential;
     } catch (e) {
+      if (kDebugMode) {
+        print("Error signing in: $e");
+      }
       rethrow;
     }
   }
@@ -58,6 +102,16 @@ class AuthService {
         throw FirebaseAuthException(
           code: 'invalid-credential',
           message: 'Invalid employee ID or not registered as mentor',
+        );
+      }
+      
+      // Check if mentor is active
+      final mentorData = mentorDoc.docs.first.data();
+      final isActive = mentorData['isActive'] ?? true;
+      if (!isActive) {
+        throw FirebaseAuthException(
+          code: 'user-disabled',
+          message: 'Your account has been deactivated. Please contact an administrator.',
         );
       }
 
@@ -86,7 +140,7 @@ class AuthService {
         email: email,
         password: password,
       );
-
+      
       // Create user data in Firestore
       final user = UserModel(
         uid: userCredential.user!.uid,
@@ -99,7 +153,7 @@ class AuthService {
         isApproved: true,
         document: document,
       );
-
+      
       await _firestore.collection('users').doc(userCredential.user!.uid).set(user.toMap());
 
       return userCredential;
@@ -123,7 +177,7 @@ class AuthService {
         email: email,
         password: password,
       );
-
+      
       // Create user data in Firestore
       final user = UserModel(
         uid: userCredential.user!.uid,
@@ -136,7 +190,7 @@ class AuthService {
         isApproved: false,
         document: document,
       );
-
+      
       await _firestore.collection('users').doc(userCredential.user!.uid).set(user.toMap());
 
       return userCredential;
@@ -378,23 +432,69 @@ class AuthService {
   // Sign in student with roll number
   Future<UserCredential?> signInWithRollNumber(String rollNumber, String password) async {
     try {
-      // First find the student's email using roll number
-      final studentDoc = await _firestore
-          .collection('users')
-          .where('rollNo', isEqualTo: int.parse(rollNumber))
-          .where('role', isEqualTo: 'student')
-          .limit(1)
-          .get();
+      if (kDebugMode) {
+        print('Attempting to sign in with roll number: $rollNumber');
+      }
 
-      if (studentDoc.docs.isEmpty) {
+      // Try to parse roll number as integer, but also keep the original string
+      int? rollNoInt;
+      try {
+        rollNoInt = int.parse(rollNumber);
+      } catch (e) {
+        if (kDebugMode) {
+          print('Roll number is not a valid integer: $rollNumber');
+        }
+      }
+
+      // Query for student with either string or integer roll number
+      QuerySnapshot studentQuery;
+      if (rollNoInt != null) {
+        studentQuery = await _firestore
+            .collection('users')
+            .where('role', isEqualTo: 'student')
+            .where('isActive', isEqualTo: true)  // Only active students
+            .where(Filter.or(
+              Filter('rollNo', isEqualTo: rollNoInt),
+              Filter('rollNo', isEqualTo: rollNumber),
+            ))
+            .limit(1)
+            .get();
+      } else {
+        studentQuery = await _firestore
+            .collection('users')
+            .where('role', isEqualTo: 'student')
+            .where('isActive', isEqualTo: true)  // Only active students
+            .where('rollNo', isEqualTo: rollNumber)
+            .limit(1)
+            .get();
+      }
+
+      if (studentQuery.docs.isEmpty) {
+        if (kDebugMode) {
+          print('No student found with roll number: $rollNumber');
+        }
         throw FirebaseAuthException(
           code: 'invalid-credential',
-          message: 'Invalid roll number',
+          message: 'Invalid roll number or student account is inactive',
         );
       }
 
-      final studentData = studentDoc.docs.first.data();
-      final email = studentData['email'] as String;
+      final studentData = studentQuery.docs.first.data() as Map<String, dynamic>;
+      final email = studentData['email'] as String?;
+
+      if (email == null) {
+        if (kDebugMode) {
+          print('Student found but email is null for roll number: $rollNumber');
+        }
+        throw FirebaseAuthException(
+          code: 'invalid-credential',
+          message: 'Student account is not properly configured',
+        );
+      }
+
+      if (kDebugMode) {
+        print('Found student with email: $email');
+      }
 
       // Then sign in with email and password
       return await _auth.signInWithEmailAndPassword(
@@ -402,7 +502,16 @@ class AuthService {
         password: password,
       );
     } catch (e) {
-      rethrow;
+      if (kDebugMode) {
+        print('Error in signInWithRollNumber: $e');
+      }
+      if (e is FirebaseAuthException) {
+        rethrow;
+      }
+      throw FirebaseAuthException(
+        code: 'sign-in-failed',
+        message: 'Failed to sign in: ${e.toString()}',
+      );
     }
   }
 } 

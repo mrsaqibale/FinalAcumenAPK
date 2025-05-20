@@ -1,5 +1,4 @@
 import 'package:acumen/features/assignments/models/assignment_model.dart';
-import 'package:acumen/features/auth/models/user_model.dart';
 import 'package:flutter/foundation.dart';
 import 'package:uuid/uuid.dart';
 

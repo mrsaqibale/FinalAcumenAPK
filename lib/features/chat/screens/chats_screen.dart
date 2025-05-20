@@ -2,8 +2,10 @@ import 'package:acumen/theme/app_theme.dart';
 import 'package:acumen/widgets/chat/community_chats_widget.dart';
 import 'package:acumen/widgets/chat/new_chat_dialog_widget.dart';
 import 'package:acumen/widgets/chat/new_community_dialog_widget.dart';
-import 'package:acumen/widgets/chat/resources_tab_widget.dart';
+import 'package:acumen/features/resources/widgets/resources_tab_widget.dart';
 import 'package:acumen/widgets/chat/solo_chats_widget.dart';
+import 'package:acumen/features/profile/models/user_model.dart';
+import 'package:acumen/features/chat/screens/chat_detail_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:provider/provider.dart';
@@ -12,10 +14,12 @@ import 'package:acumen/features/chat/controllers/chat_controller.dart';
 
 class ChatsScreen extends StatefulWidget {
   final int initialTabIndex;
+  final UserModel? selectedMentor;
 
   const ChatsScreen({
     super.key,
     this.initialTabIndex = 0,
+    this.selectedMentor,
   });
 
   @override
@@ -35,6 +39,41 @@ class _ChatsScreenState extends State<ChatsScreen> with SingleTickerProviderStat
       vsync: this,
       initialIndex: widget.initialTabIndex,
     );
+
+    // If a mentor is selected, create a chat with them
+    if (widget.selectedMentor != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _createChatWithMentor(widget.selectedMentor!);
+      });
+    }
+  }
+
+  Future<void> _createChatWithMentor(UserModel mentor) async {
+    try {
+      final chatController = Provider.of<ChatController>(context, listen: false);
+      final conversation = await chatController.createConversation(
+        participantId: mentor.id,
+        participantName: mentor.name,
+        participantImageUrl: mentor.photoUrl,
+      );
+    
+      if (!mounted) return;
+      
+      // Navigate to the chat detail screen
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => ChatDetailScreen(
+            conversationId: conversation.id,
+          ),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to start chat: $e')),
+      );
+    }
   }
 
   @override
@@ -73,9 +112,13 @@ class _ChatsScreenState extends State<ChatsScreen> with SingleTickerProviderStat
                 controller: _tabController,
                 isScrollable: false,
                 indicatorSize: TabBarIndicatorSize.tab,
-                indicator: const UnderlineTabIndicator(
-                  borderSide: BorderSide(color: Colors.white, width: 2.0),
-                  insets: EdgeInsets.symmetric(horizontal: 10.0),
+                indicator: BoxDecoration(
+                  border: Border(
+                    bottom: BorderSide(
+                      color: Colors.white,
+                      width: 2.0,
+                    ),
+                  ),
                 ),
                 dividerHeight: 0,
                 labelColor: Colors.white,

@@ -1,17 +1,58 @@
 import 'package:flutter/material.dart';
-import 'package:acumen/features/chat/screens/chats_screen.dart';
+import 'package:acumen/features/chat/screens/chat_detail_screen.dart';
 import 'package:acumen/features/profile/models/user_model.dart';
 import 'package:acumen/features/profile/screens/mentor_profile_screen.dart';
 import 'package:acumen/widgets/cached_profile_image.dart';
 import 'package:acumen/utils/app_snackbar.dart';
+import 'package:provider/provider.dart';
+import 'package:acumen/features/chat/controllers/chat_controller.dart';
 
 class MentorCardWidget extends StatelessWidget {
   final UserModel mentor;
+  final VoidCallback? onTap;
 
   const MentorCardWidget({
     super.key,
     required this.mentor,
+    this.onTap,
   });
+
+  Future<void> _startChat(BuildContext context) async {
+    if (!mentor.isActive) {
+      AppSnackbar.showError(
+        context: context,
+        message: 'This mentor is currently inactive',
+      );
+      return;
+    }
+
+    try {
+      final chatController = Provider.of<ChatController>(context, listen: false);
+      final conversation = await chatController.createConversation(
+        participantId: mentor.id,
+        participantName: mentor.name,
+        participantImageUrl: mentor.photoUrl,
+      );
+      
+      if (!context.mounted) return;
+      
+      // Navigate directly to chat detail screen
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => ChatDetailScreen(
+            conversationId: conversation.id,
+          ),
+        ),
+      );
+    } catch (e) {
+      if (!context.mounted) return;
+      AppSnackbar.showError(
+        context: context,
+        message: 'Failed to start chat: $e',
+      );
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -87,21 +128,7 @@ class MentorCardWidget extends StatelessWidget {
           ),
         ),
         trailing: const Icon(Icons.arrow_forward_ios, size: 14, color: Colors.grey),
-        onTap: () {
-          if (mentor.isActive) {
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => ChatsScreen(initialTabIndex: 0),
-              ),
-            );
-          } else {
-            AppSnackbar.showError(
-              context: context,
-              message: 'This mentor is currently inactive',
-            );
-          }
-        },
+        onTap: onTap ?? () => _startChat(context),
       ),
     );
   }

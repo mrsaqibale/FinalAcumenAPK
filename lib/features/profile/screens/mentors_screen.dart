@@ -2,6 +2,7 @@ import 'package:acumen/features/profile/controllers/user_controller.dart';
 import 'package:acumen/features/profile/models/user_model.dart';
 import 'package:acumen/features/profile/widgets/mentor_card_widget.dart';
 import 'package:acumen/theme/app_theme.dart';
+import 'package:acumen/features/chat/screens/chats_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:provider/provider.dart';
@@ -127,8 +128,8 @@ class _MentorsScreenState extends State<MentorsScreen> {
                         },
                       )
                     : null,
-                filled: true,
-                fillColor: Colors.white.withOpacity(0.2),
+                 filled: true,
+                 fillColor: Colors.white.withOpacity(0.2),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(30),
                   borderSide: BorderSide.none,
@@ -205,7 +206,9 @@ class _MentorsScreenState extends State<MentorsScreen> {
                             itemCount: filteredMentors.length,
                             itemBuilder: (context, index) {
                               final mentor = filteredMentors[index];
-                              return MentorCardWidget(mentor: mentor);
+                              return MentorCardWidget(
+                                mentor: mentor,
+                              );
                             },
                           ),
                         );

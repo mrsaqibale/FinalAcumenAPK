@@ -4,10 +4,12 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
+import 'package:file_picker/file_picker.dart';
 import '../controllers/user_controller.dart';
 import '../models/user_model.dart';
 import 'package:acumen/theme/app_theme.dart';
 import 'package:acumen/utils/app_snackbar.dart';
+import 'package:acumen/features/auth/utils/login_validation.dart';
 
 class UserForm extends StatefulWidget {
   final String role;
@@ -22,17 +24,26 @@ class _UserFormState extends State<UserForm> {
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
   final _emailController = TextEditingController();
-  final _titleController = TextEditingController();
   final _passwordController = TextEditingController();
+  final _rollNoController = TextEditingController();
+  final _employeeIdController = TextEditingController();
+  final _departmentController = TextEditingController();
+  final _titleController = TextEditingController();
+  
   bool _isSubmitting = false;
+  bool _isFirstSemester = false;
   File? _selectedImage;
+  PlatformFile? _selectedDocument;
 
   @override
   void dispose() {
     _nameController.dispose();
     _emailController.dispose();
-    _titleController.dispose();
     _passwordController.dispose();
+    _rollNoController.dispose();
+    _employeeIdController.dispose();
+    _departmentController.dispose();
+    _titleController.dispose();
     super.dispose();
   }
 
@@ -47,91 +58,132 @@ class _UserFormState extends State<UserForm> {
     }
   }
 
+  Future<void> _pickDocument() async {
+    try {
+      final result = await FilePicker.platform.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: ['pdf', 'jpg', 'jpeg', 'png'],
+      );
+
+      if (result != null) {
+        setState(() {
+          _selectedDocument = result.files.first;
+        });
+      }
+    } catch (e) {
+      _showSnackBar('Error picking document: $e', isSuccess: false);
+    }
+  }
+
   Future<String?> _uploadImage(String userId) async {
     if (_selectedImage == null) return null;
     
     try {
       final ref = FirebaseStorage.instance.ref().child('profile_images').child('$userId.jpg');
-      
-      // Upload the image
       await ref.putFile(_selectedImage!);
-      
-      // Get the download URL
-      final downloadUrl = await ref.getDownloadURL();
-      return downloadUrl;
+      return await ref.getDownloadURL();
     } catch (e) {
-      print('Error uploading image: $e');
+      _showSnackBar('Error uploading image: $e', isSuccess: false);
+      return null;
+    }
+  }
+
+  Future<String?> _uploadDocument(String userId) async {
+    if (_selectedDocument == null) return null;
+    
+    try {
+      final ref = FirebaseStorage.instance.ref()
+          .child('documents')
+          .child(widget.role)
+          .child('$userId.${_selectedDocument!.extension}');
+      
+      await ref.putData(_selectedDocument!.bytes!);
+      return await ref.getDownloadURL();
+    } catch (e) {
+      _showSnackBar('Error uploading document: $e', isSuccess: false);
       return null;
     }
   }
 
   void _showSnackBar(String message, {bool isSuccess = true}) {
     if (isSuccess) {
-      AppSnackbar.showSuccess(
-        context: context,
-        message: message,
-      );
+      AppSnackbar.showSuccess(context: context, message: message);
     } else {
-      AppSnackbar.showError(
-        context: context,
-        message: message,
-      );
+      AppSnackbar.showError(context: context, message: message);
     }
   }
 
   Future<void> _submitForm() async {
-    if (_formKey.currentState!.validate()) {
-      setState(() {
-        _isSubmitting = true;
-      });
+    if (!_formKey.currentState!.validate()) return;
 
-      try {
-        // Create user in Firebase Auth
-        final userCredential = await FirebaseAuth.instance.createUserWithEmailAndPassword(
+    // Validate document for students and mentors
+    if ((widget.role == 'student' || widget.role == 'mentor') && _selectedDocument == null) {
+      _showSnackBar('Please upload required document', isSuccess: false);
+      return;
+    }
+
+    setState(() {
+      _isSubmitting = true;
+    });
+
+    try {
+      // Create user in Firebase Auth
+      final userCredential = await FirebaseAuth.instance.createUserWithEmailAndPassword(
+        email: _emailController.text.trim(),
+        password: _passwordController.text.trim(),
+      );
+
+      if (userCredential.user != null) {
+        final userId = userCredential.user!.uid;
+        
+        // Upload image and document if selected
+        String? photoUrl;
+        String? documentUrl;
+        
+        if (_selectedImage != null) {
+          photoUrl = await _uploadImage(userId);
+        }
+        
+        if (_selectedDocument != null) {
+          documentUrl = await _uploadDocument(userId);
+        }
+        
+        // Create user model based on role
+        final newUser = UserModel(
+          id: userId,
+          name: _nameController.text.trim(),
           email: _emailController.text.trim(),
-          password: _passwordController.text.trim(),
+          role: widget.role,
+          isActive: true,
+          title: widget.role == 'mentor' ? _titleController.text.trim() : null,
+          photoUrl: photoUrl,
+          status: widget.role == 'mentor' ? 'pending_approval' : 'active',
+          isApproved: widget.role == 'mentor' ? false : true,
+          // Additional fields based on role
+          employeeId: widget.role == 'mentor' ? _employeeIdController.text.trim() : null,
+          department: widget.role == 'mentor' ? _departmentController.text.trim() : null,
+          rollNo: widget.role == 'student' ? int.tryParse(_rollNoController.text.trim()) : null,
+          isFirstSemester: widget.role == 'student' ? _isFirstSemester : null,
+          document: documentUrl,
         );
 
-        if (userCredential.user != null) {
-          final userId = userCredential.user!.uid;
-          
-          // Upload image if selected
-          String? photoUrl;
-          if (_selectedImage != null) {
-            photoUrl = await _uploadImage(userId);
-          }
-          
-          // Create user model
-          final newUser = UserModel(
-            id: userId,
-            name: _nameController.text.trim(),
-            email: _emailController.text.trim(),
-            role: widget.role,
-            isActive: true,
-            title: widget.role == 'mentor' ? _titleController.text.trim() : null,
-            photoUrl: photoUrl,
-            status: widget.role == 'teacher' || widget.role == 'mentor' ? 'pending_approval' : 'active',
-            isApproved: widget.role == 'teacher' || widget.role == 'mentor' ? false : true,
-          );
+        // Add user to Firestore
+        final userController = Provider.of<UserController>(context, listen: false);
+        final result = await userController.addUser(newUser);
 
-          // Add user to Firestore
-          final userController = Provider.of<UserController>(context, listen: false);
-          final result = await userController.addUser(newUser);
-
-          if (result) {
-            _showSnackBar('${widget.role.capitalize()} added successfully');
-            Navigator.pop(context);
-          } else {
-            _showSnackBar('Failed to add user', isSuccess: false);
-          }
+        if (result) {
+          _showSnackBar('${widget.role.capitalize()} added successfully');
+          Navigator.pop(context);
+        } else {
+          _showSnackBar('Failed to add user', isSuccess: false);
         }
-      } catch (e) {
-        _showSnackBar('Error: ${e.toString()}', isSuccess: false);
-      } finally {
-        setState(() {
-          _isSubmitting = false;
-        });
       }
+    } catch (e) {
+      _showSnackBar('Error: ${e.toString()}', isSuccess: false);
+    } finally {
+      setState(() {
+        _isSubmitting = false;
+      });
     }
   }
 
@@ -159,18 +211,14 @@ class _UserFormState extends State<UserForm> {
                         backgroundColor: Colors.grey[200],
                         backgroundImage: _selectedImage != null ? FileImage(_selectedImage!) : null,
                         child: _selectedImage == null
-                            ? Icon(
-                                Icons.person,
-                                size: 50,
-                                color: Colors.grey[400],
-                              )
+                            ? Icon(Icons.person, size: 50, color: Colors.grey[400])
                             : null,
                       ),
                       Positioned(
                         bottom: 0,
                         right: 0,
                         child: Container(
-                          decoration: BoxDecoration(
+                          decoration: const BoxDecoration(
                             color: AppTheme.primaryColor,
                             shape: BoxShape.circle,
                           ),
@@ -187,6 +235,8 @@ class _UserFormState extends State<UserForm> {
                 ),
               ),
               const SizedBox(height: 24),
+
+              // Common fields for all roles
               TextFormField(
                 controller: _nameController,
                 decoration: const InputDecoration(
@@ -194,12 +244,7 @@ class _UserFormState extends State<UserForm> {
                   border: OutlineInputBorder(),
                   prefixIcon: Icon(Icons.person_outline),
                 ),
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Please enter a name';
-                  }
-                  return null;
-                },
+                validator: LoginValidation.validateName,
               ),
               const SizedBox(height: 16),
               TextFormField(
@@ -210,15 +255,7 @@ class _UserFormState extends State<UserForm> {
                   prefixIcon: Icon(Icons.email_outlined),
                 ),
                 keyboardType: TextInputType.emailAddress,
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Please enter an email';
-                  }
-                  if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(value)) {
-                    return 'Please enter a valid email';
-                  }
-                  return null;
-                },
+                validator: LoginValidation.validateEmail,
               ),
               const SizedBox(height: 16),
               TextFormField(
@@ -229,37 +266,102 @@ class _UserFormState extends State<UserForm> {
                   prefixIcon: Icon(Icons.lock_outline),
                 ),
                 obscureText: true,
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Please enter a password';
-                  }
-                  if (value.length < 6) {
-                    return 'Password must be at least 6 characters';
-                  }
-                  return null;
-                },
+                validator: LoginValidation.validatePassword,
               ),
               const SizedBox(height: 16),
-              if (widget.role == 'mentor')
-                Column(
+
+              // Role-specific fields
+              if (widget.role == 'student') ...[
+                TextFormField(
+                  controller: _rollNoController,
+                  decoration: const InputDecoration(
+                    labelText: 'Roll Number',
+                    border: OutlineInputBorder(),
+                    prefixIcon: Icon(Icons.tag),
+                  ),
+                  keyboardType: TextInputType.number,
+                  validator: LoginValidation.validateRollNumber,
+                ),
+                const SizedBox(height: 16),
+                Row(
                   children: [
-                    TextFormField(
-                      controller: _titleController,
-                      decoration: const InputDecoration(
-                        labelText: 'Title (e.g. CS Professor)',
-                        border: OutlineInputBorder(),
-                        prefixIcon: Icon(Icons.work_outline),
-                      ),
-                      validator: (value) {
-                        if (value == null || value.isEmpty) {
-                          return 'Please enter a title';
-                        }
-                        return null;
+                    Checkbox(
+                      value: _isFirstSemester,
+                      onChanged: (value) {
+                        setState(() {
+                          _isFirstSemester = value ?? false;
+                        });
                       },
                     ),
-                    const SizedBox(height: 16),
+                    const Text('Is First Semester Student?'),
                   ],
                 ),
+                const SizedBox(height: 16),
+                // Document upload for students
+                ElevatedButton.icon(
+                  onPressed: _pickDocument,
+                  icon: const Icon(Icons.upload_file),
+                  label: Text(_selectedDocument == null 
+                    ? 'Upload Student Document' 
+                    : 'Document: ${_selectedDocument!.name}'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.grey[200],
+                    foregroundColor: Colors.black87,
+                  ),
+                ),
+              ],
+
+              if (widget.role == 'mentor') ...[
+                TextFormField(
+                  controller: _employeeIdController,
+                  decoration: const InputDecoration(
+                    labelText: 'Employee ID',
+                    border: OutlineInputBorder(),
+                    prefixIcon: Icon(Icons.badge),
+                  ),
+                  validator: LoginValidation.validateEmployeeId,
+                ),
+                const SizedBox(height: 16),
+                TextFormField(
+                  controller: _departmentController,
+                  decoration: const InputDecoration(
+                    labelText: 'Department',
+                    border: OutlineInputBorder(),
+                    prefixIcon: Icon(Icons.business),
+                  ),
+                  validator: LoginValidation.validateDepartment,
+                ),
+                const SizedBox(height: 16),
+                TextFormField(
+                  controller: _titleController,
+                  decoration: const InputDecoration(
+                    labelText: 'Title (e.g. CS Professor)',
+                    border: OutlineInputBorder(),
+                    prefixIcon: Icon(Icons.work_outline),
+                  ),
+                  validator: (value) {
+                    if (value == null || value.isEmpty) {
+                      return 'Please enter a title';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 16),
+                // Document upload for mentors
+                ElevatedButton.icon(
+                  onPressed: _pickDocument,
+                  icon: const Icon(Icons.upload_file),
+                  label: Text(_selectedDocument == null 
+                    ? 'Upload Credentials Document' 
+                    : 'Document: ${_selectedDocument!.name}'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.grey[200],
+                    foregroundColor: Colors.black87,
+                  ),
+                ),
+              ],
+
+              const SizedBox(height: 24),
               ElevatedButton(
                 onPressed: _isSubmitting ? null : _submitForm,
                 style: ElevatedButton.styleFrom(

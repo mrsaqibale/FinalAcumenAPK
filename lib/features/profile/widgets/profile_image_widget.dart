@@ -35,12 +35,11 @@ class ProfileImageWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Positioned(
-      top: topPosition,
-      left: 0,
-      right: 0,
+    return SizedBox(
+      height: 150,
       child: Center(
         child: Stack(
+          clipBehavior: Clip.none,
           children: [
             CachedProfileImage(
               imageUrl: imageUrl,
@@ -49,8 +48,8 @@ class ProfileImageWidget extends StatelessWidget {
               onTap: () => _handleImageTap(context),
             ),
             Positioned(
-              right: 0,
-              bottom: 0,
+              right: -10,
+              bottom: -10,
               child: GestureDetector(
                 onTap: onCameraTap,
                 child: Container(

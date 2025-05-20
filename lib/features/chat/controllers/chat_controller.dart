@@ -3,11 +3,17 @@ import 'package:acumen/features/chat/models/chat_conversation_model.dart';
 import 'package:acumen/features/chat/models/chat_message_model.dart';
 import 'package:acumen/features/chat/models/conversation_model.dart';
 import 'package:acumen/features/chat/services/chat_service.dart';
+import 'package:acumen/features/notification/controllers/notification_controller.dart';
+import 'package:acumen/features/business/controllers/quiz_results_controller.dart';
 import 'package:flutter/foundation.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter/material.dart';
 import 'dart:async';
+import 'dart:io';
 import 'package:rxdart/rxdart.dart';
+import 'package:flutter/widgets.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 class ChatController extends ChangeNotifier {
   bool _isLoading = true;
@@ -94,6 +100,22 @@ class ChatController extends ChangeNotifier {
     if (!_messageSubscriptions.containsKey(conversationId)) {
       _messageSubscriptions[conversationId] = ChatService.getMessagesStream(conversationId).listen((messages) {
         _messagesCache[conversationId] = messages;
+        
+        // Check for new messages and create notifications
+        if (messages.isNotEmpty) {
+          final latestMessage = messages.first;
+          final conversation = getConversation(conversationId);
+          
+          if (conversation != null && 
+              latestMessage.senderId != FirebaseAuth.instance.currentUser?.uid) {
+            // Create notification for new message
+            _createMessageNotification(
+              conversation: conversation,
+              message: latestMessage,
+            );
+          }
+        }
+        
         notifyListeners();
       });
     }
@@ -111,6 +133,30 @@ class ChatController extends ChangeNotifier {
     await markConversationAsRead(conversationId);
     
     return messages;
+  }
+  
+  // Create notification for new message
+  void _createMessageNotification({
+    required ChatConversation conversation,
+    required ChatMessage message,
+  }) {
+    try {
+      final notificationController = Provider.of<NotificationController>(
+        navigatorKey.currentContext!,
+        listen: false,
+      );
+      
+      notificationController.addMessageNotification(
+        senderName: conversation.participantName,
+        message: message.text,
+        senderId: message.senderId,
+        conversationId: conversation.id,
+      );
+    } catch (e) {
+      if (kDebugMode) {
+        print('Error creating message notification: $e');
+      }
+    }
   }
   
   // Send a message
@@ -239,15 +285,41 @@ class ChatController extends ChangeNotifier {
       _isLoading = true;
       notifyListeners();
       
-      _availableCommunities = await ChatService.getAvailableCommunities();
+      final currentUser = FirebaseAuth.instance.currentUser;
+      if (currentUser == null) {
+        if (kDebugMode) {
+          print('Cannot fetch communities: User is not authenticated');
+        }
+        return;
+      }
+      
+      // Get all communities and filter those that the user is not a member of
+      final communitiesSnapshot = await FirebaseFirestore.instance
+          .collection('communities')
+          .where('isPublic', isEqualTo: true)
+          .get();
+      
+      final userCommunitiesSnapshot = await FirebaseFirestore.instance
+          .collection('communities')
+          .where('members', arrayContains: currentUser.uid)
+          .get();
+      
+      // Extract the IDs of communities the user is already a member of
+      final userCommunityIds = userCommunitiesSnapshot.docs.map((doc) => doc.id).toSet();
+      
+      // Filter out communities the user is already a member of
+      _availableCommunities = communitiesSnapshot.docs
+          .where((doc) => !userCommunityIds.contains(doc.id))
+          .map((doc) => ConversationModel.fromFirestore(doc))
+          .toList();
       
       _isLoading = false;
       notifyListeners();
     } catch (e) {
-      _isLoading = false;
       if (kDebugMode) {
         print('Error fetching available communities: $e');
       }
+      _isLoading = false;
       notifyListeners();
     }
   }
@@ -359,15 +431,33 @@ class ChatController extends ChangeNotifier {
   // Send a message to community
   Future<void> sendCommunityMessage({
     required String communityId,
-    required String text,
+    String? text,
     String? imageUrl,
+    File? mediaFile,
+    String? mediaType,
   }) async {
     try {
-      await ChatService.sendCommunityMessage(
-        communityId: communityId,
-        text: text,
-        imageUrl: imageUrl,
-      );
+      if (mediaFile != null) {
+        // Upload the media file to Firebase Storage and get URL
+        final String mediaUrl = await ChatService.uploadMediaFile(
+          file: mediaFile, 
+          path: 'community_media/$communityId/${DateTime.now().millisecondsSinceEpoch}'
+        );
+        
+        // Send message with media URL
+        await ChatService.sendCommunityMessage(
+          communityId: communityId,
+          text: text ?? '',
+          imageUrl: mediaUrl,
+          contentType: mediaType,
+        );
+      } else {
+        await ChatService.sendCommunityMessage(
+          communityId: communityId,
+          text: text ?? '',
+          imageUrl: imageUrl,
+        );
+      }
     } catch (e) {
       if (kDebugMode) {
         print('Error sending community message: $e');
@@ -384,6 +474,40 @@ class ChatController extends ChangeNotifier {
   // Get communities the current user is a member of
   Stream<List<Map<String, dynamic>>> getUserCommunitiesStream() {
     return ChatService.getUserCommunitiesStream();
+  }
+
+  // Create or get existing one-to-one conversation
+  Future<ChatConversation?> createOneToOneConversation({
+    required String participantId,
+    required String participantName,
+  }) async {
+    try {
+      final currentUser = FirebaseAuth.instance.currentUser;
+      if (currentUser == null) {
+        if (kDebugMode) {
+          print('Error creating conversation: User is not authenticated');
+        }
+        return null;
+      }
+      
+      // Check if conversation already exists
+      for (var conversation in _conversations) {
+        if (!conversation.isGroup && conversation.participantId == participantId) {
+          return conversation;
+        }
+      }
+
+      // Create a new conversation
+      return await createConversation(
+        participantId: participantId,
+        participantName: participantName,
+      );
+    } catch (e) {
+      if (kDebugMode) {
+        print('Error creating one-to-one conversation: $e');
+      }
+      return null;
+    }
   }
 
   @override

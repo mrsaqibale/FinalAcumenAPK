@@ -1,10 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:acumen/features/auth/controllers/auth_controller.dart';
 import 'package:acumen/features/chat/controllers/chat_controller.dart';
-import 'package:acumen/features/chat/screens/community_chat_screen.dart';
-import 'package:acumen/theme/app_theme.dart';
 import 'package:acumen/utils/app_snackbar.dart';
 import 'package:acumen/features/dashboard/widgets/community_card_widget.dart';
 import 'package:acumen/features/dashboard/widgets/members_dialog_widget.dart';

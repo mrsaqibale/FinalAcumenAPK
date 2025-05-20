@@ -1,12 +1,8 @@
 import 'package:acumen/features/auth/screens/forgot_password_screen.dart';
 import 'package:acumen/features/auth/screens/signup_screen.dart';
-import 'package:acumen/features/auth/screens/mentor_login_screen.dart';
-import 'package:acumen/features/auth/screens/mentor_signup_screen.dart';
 import 'package:acumen/features/auth/utils/login_validation.dart';
-import 'package:acumen/features/dashboard/screens/admin_dashboard_screen.dart';
 import 'package:acumen/theme/app_theme.dart';
 import 'package:acumen/widgets/common/custom_text_field.dart';
-import 'package:acumen/widgets/common/primary_button.dart';
 import 'package:flutter/material.dart';
 
 class LoginForm extends StatefulWidget {
@@ -14,7 +10,6 @@ class LoginForm extends StatefulWidget {
   final TextEditingController passwordController;
   final VoidCallback onLogin;
   final bool isLoading;
-  final ValueChanged<bool>? onLoginModeChanged;
 
   const LoginForm({
     super.key,
@@ -22,7 +17,6 @@ class LoginForm extends StatefulWidget {
     required this.passwordController,
     required this.onLogin,
     this.isLoading = false,
-    this.onLoginModeChanged,
   });
 
   @override
@@ -31,26 +25,12 @@ class LoginForm extends StatefulWidget {
 
 class _LoginFormState extends State<LoginForm> {
   final _formKey = GlobalKey<FormState>();
-  bool _isAdminLogin = false;
   
   void _trySubmit() {
     final isValid = _formKey.currentState?.validate() ?? false;
     
     if (isValid) {
       widget.onLogin();
-    }
-  }
-
-  void _toggleLoginMode(bool value) {
-    setState(() {
-      _isAdminLogin = value;
-      // Clear the field when switching login modes
-      widget.rollNumberController.clear();
-    });
-    
-    // Notify parent about the change
-    if (widget.onLoginModeChanged != null) {
-      widget.onLoginModeChanged!(value);
     }
   }
 
@@ -72,43 +52,39 @@ class _LoginFormState extends State<LoginForm> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              const SizedBox(height: 10),
-              Text(
-                _isAdminLogin ? 'Admin Login' : 'Student Login',
-                style: const TextStyle(
+              const SizedBox(height: 20),
+              const Text(
+                'Login',
+                style: TextStyle(
                   fontSize: 24,
                   fontWeight: FontWeight.bold,
                 ),
               ),
-              const SizedBox(height: 8),
-              
-              // Toggle switch between student and admin login
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Text('Student'),
-                  Switch(
-                    value: _isAdminLogin,
-                    onChanged: _toggleLoginMode,
-                    activeColor: AppTheme.primaryColor,
-                  ),
-                  const Text('Admin'),
-                ],
+              const SizedBox(height: 16),
+              const Text(
+                'Use your roll number, email, or ID card number to sign in',
+                style: TextStyle(
+                  fontSize: 14,
+                  color: Colors.grey,
+                ),
+                textAlign: TextAlign.center,
               ),
-              
-              const SizedBox(height: 10),
+              const SizedBox(height: 20),
               CustomTextField(
                 controller: widget.rollNumberController,
-                hintText: _isAdminLogin ? 'Enter Email' : 'Enter Roll Number',
-                prefixIcon: Icon(
-                  _isAdminLogin ? Icons.email : Icons.tag,
+                hintText: 'Roll Number / Email / ID Card',
+                prefixIcon: const Icon(
+                  Icons.person,
                   color: Colors.grey
                 ),
-                validator: _isAdminLogin 
-                  ? LoginValidation.validateEmail 
-                  : LoginValidation.validateRollNumber,
+                validator: (value) {
+                  if (value == null || value.isEmpty) {
+                    return 'Please enter your roll number, email, or ID card';
+                  }
+                  return null;
+                },
               ),
-              const SizedBox(height: 5),
+              const SizedBox(height: 10),
               CustomTextField(
                 controller: widget.passwordController,
                 hintText: 'Password',
@@ -143,9 +119,9 @@ class _LoginFormState extends State<LoginForm> {
                   ),
                 ),
               ),
-              const SizedBox(height: 10),
+              const SizedBox(height: 20),
               SizedBox(
-                width: 200,
+                width: double.infinity,
                 child: ElevatedButton(
                   onPressed: widget.isLoading ? null : _trySubmit,
                   style: ElevatedButton.styleFrom(
@@ -168,86 +144,34 @@ class _LoginFormState extends State<LoginForm> {
                       )
                     : const Text(
                         'Login',
-                        style: TextStyle(fontSize: 16),
+                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                       ),
                 ),
               ),
-              const SizedBox(height: 10),
-              if (!_isAdminLogin)
-                OutlinedButton(
-                  onPressed: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => const MentorLoginScreen(),
-                      ),
-                    );
-                  },
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: AppTheme.primaryColor,
-                    side: const BorderSide(color: AppTheme.primaryColor),
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 40,
-                      vertical: 12,
-                    ),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10),
+              const SizedBox(height: 20),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Text(
+                    "Don't have an account?",
+                    style: TextStyle(color: Colors.grey),
+                  ),
+                  TextButton(
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const SignupScreen(),
+                        ),
+                      );
+                    },
+                    child: const Text(
+                      'Sign up',
+                      style: TextStyle(color: AppTheme.accentColor),
                     ),
                   ),
-                  child: const Text(
-                    'Login as Mentor',
-                    style: TextStyle(fontSize: 16),
-                  ),
-                ),
-              const SizedBox(height: 10),
-              if (!_isAdminLogin)
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    const Text(
-                      "Don't have an account?",
-                      style: TextStyle(color: Colors.grey),
-                    ),
-                    TextButton(
-                      onPressed: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => const SignupScreen(),
-                          ),
-                        );
-                      },
-                      child: const Text(
-                        'Sign up',
-                        style: TextStyle(color: AppTheme.accentColor),
-                      ),
-                    ),
-                  ],
-                ),
-              // const SizedBox(height: 10),
-              // Row(
-              //   mainAxisAlignment: MainAxisAlignment.center,
-              //   children: [
-              //     const Text(
-              //         "Are you a Admin?",
-              //       style: TextStyle(color: Colors.grey),
-              //     ),
-              //     TextButton(
-              //       onPressed: () {
-              //         Navigator.push(
-              //           context,
-              //           MaterialPageRoute(
-              //               builder: (context) => const AdminDashboardScreen(),
-              //           ),
-              //         );
-              //       },
-              //       child: const Text(
-              //           'Mentor Sign Up',
-              //         style: TextStyle(color: AppTheme.accentColor),
-              //       ),
-              //     ),
-              //   ],
-              // ),
+                ],
+              ),
             ],
           ),
         ),

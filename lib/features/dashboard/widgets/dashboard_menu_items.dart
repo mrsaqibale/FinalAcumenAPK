@@ -3,6 +3,7 @@ import 'package:acumen/features/chat/screens/chats_screen.dart';
 import 'package:acumen/features/notification/screens/notifications_screen.dart';
 import 'package:acumen/features/profile/screens/edit_profile_screen.dart';
 import 'package:acumen/features/profile/screens/mentors_screen.dart';
+import 'package:acumen/features/events/screens/event_notifications_screen.dart';
 import 'package:acumen/theme/app_theme.dart';
 import 'package:flutter/material.dart';
 
@@ -33,7 +34,7 @@ class DashboardMenuItems extends StatelessWidget {
           Navigator.push(
             context,
             MaterialPageRoute(
-              builder: (context) => const MentorsScreen(),
+              builder: (context) => ChatsScreen(),
             ),
           );
         },
@@ -46,7 +47,8 @@ class DashboardMenuItems extends StatelessWidget {
           Navigator.push(
             context,
             MaterialPageRoute(
-              builder: (context) => const ChatsScreen(initialTabIndex: 1),
+              builder: (context) => const EventNotificationsScreen(),
+              // builder: (context) => const ChatsScreen(initialTabIndex: 1),
             ),
           );
         },

@@ -5,9 +5,6 @@ import 'package:acumen/theme/app_theme.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-import 'signup_screen.dart';
-import 'forgot_password_screen.dart';
-
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
 
@@ -20,7 +17,6 @@ class _LoginScreenState extends State<LoginScreen> {
   final TextEditingController passwordController = TextEditingController();
   final LoginFunctions _loginFunctions = LoginFunctions();
   bool isLoading = false;
-  bool isAdminLogin = false;
 
   @override
   void dispose() {
@@ -29,24 +25,17 @@ class _LoginScreenState extends State<LoginScreen> {
     super.dispose();
   }
 
-  void _setAdminLoginMode(bool value) {
-    setState(() {
-      isAdminLogin = value;
-    });
-  }
-
   Future<void> _login() async {
     await _loginFunctions.login(
       identifier: identifierController.text,
-      password: passwordController.text,
-      context: context,
-      isAdminLogin: isAdminLogin,
+        password: passwordController.text,
+        context: context,
       setLoading: (value) {
-        if (mounted) {
-          setState(() {
+      if (mounted) {
+        setState(() {
             isLoading = value;
-          });
-        }
+        });
+      }
       },
     );
   }
@@ -87,7 +76,6 @@ class _LoginScreenState extends State<LoginScreen> {
                   passwordController: passwordController,
                   onLogin: _login,
                   isLoading: isLoading,
-                  onLoginModeChanged: _setAdminLoginMode,
                 ),
               ),
             ],

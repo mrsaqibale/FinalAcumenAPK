@@ -23,7 +23,7 @@ class ForgotPasswordScreen extends StatelessWidget {
           onPressed: () => Navigator.pop(context),
         ),
         title: const Text(
-          'Forgot Password',
+          'Reset Password',
           style: TextStyle(
             color: Colors.black,
             fontWeight: FontWeight.bold,
@@ -47,7 +47,7 @@ class ForgotPasswordScreen extends StatelessWidget {
                 ),
                 const SizedBox(height: 80),
                 const Text(
-                  'Please Enter your email Address\nto receive a verification code.',
+                  'Enter your email address to receive a verification code for password reset.',
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     fontSize: 16,
@@ -55,11 +55,6 @@ class ForgotPasswordScreen extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 30),
-                const CustomTextField(
-                  hintText: 'Enter Roll Number',
-                  prefixIcon: Icon(Icons.tag, color: Colors.grey),
-                ),
-                const SizedBox(height: 15),
                 CustomTextField(
                   controller: emailController,
                   hintText: 'Enter your Email',
