@@ -11,25 +11,31 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:photo_view/photo_view.dart';
 
-class CommunityChatMessageList extends StatefulWidget {
+class ResourceCommunityChatList extends StatefulWidget {
   final String communityId;
   final String? currentUserId;
   final ScrollController scrollController;
   final List<Map<String, dynamic>>? messages;
+  final Function(String) onDeleteMessage;
+  final Function(String, String) onReplyToMessage;
+  final Function(String) onForwardMessage;
 
-  const CommunityChatMessageList({
+  const ResourceCommunityChatList({
     Key? key,
     required this.communityId,
     required this.currentUserId,
     required this.scrollController,
+    required this.onDeleteMessage,
+    required this.onReplyToMessage,
+    required this.onForwardMessage,
     this.messages,
   }) : super(key: key);
 
   @override
-  State<CommunityChatMessageList> createState() => _CommunityChatMessageListState();
+  State<ResourceCommunityChatList> createState() => _ResourceCommunityChatListState();
 }
 
-class _CommunityChatMessageListState extends State<CommunityChatMessageList> {
+class _ResourceCommunityChatListState extends State<ResourceCommunityChatList> {
   late MessageController _messageController;
   List<Map<String, dynamic>> _messages = [];
   
@@ -53,17 +59,14 @@ class _CommunityChatMessageListState extends State<CommunityChatMessageList> {
     try {
       await _messageController.openMedia(messageId, url, contentType);
       
-      // If it's a voice message, the controller handles playback
       if (contentType == 'voice') {
         return;
       }
       
-      // For images, open fullscreen view
       if (contentType == 'image' && _messageController.isDownloaded(messageId)) {
         _openImageFullScreen(url);
       }
       
-      // For other file types, launch URL
       if (contentType != 'image' && contentType != 'voice' && _messageController.isDownloaded(messageId)) {
         final Uri uri = Uri.parse(url);
         if (await canLaunchUrl(uri)) {
@@ -123,17 +126,14 @@ class _CommunityChatMessageListState extends State<CommunityChatMessageList> {
       onAction: (action) async {
         switch (action) {
           case 'reply':
-            // Show reply dialog
-            _showReplyDialog(message);
+            widget.onReplyToMessage(message['id'], message['text'] ?? '');
             break;
           case 'delete':
             if (isCurrentUser) {
-              // Show delete confirmation
-              _showDeleteConfirmation([message['id']]);
+              widget.onDeleteMessage(message['id']);
             }
             break;
           case 'copy':
-            // Copy message text
             if (message['text'] != null && message['text'].isNotEmpty) {
               await Clipboard.setData(ClipboardData(text: message['text']));
               if (mounted) {
@@ -144,8 +144,7 @@ class _CommunityChatMessageListState extends State<CommunityChatMessageList> {
             }
             break;
           case 'forward':
-            // Show forward dialog
-            _showForwardDialog(message);
+            widget.onForwardMessage(message['id']);
             break;
         }
       },
@@ -174,7 +173,7 @@ class _CommunityChatMessageListState extends State<CommunityChatMessageList> {
                 Navigator.pop(context);
                 final messageId = _messageController.selectedMessageIds.first;
                 final message = _messages.firstWhere((m) => m['id'] == messageId);
-                _showReplyDialog(message);
+                widget.onReplyToMessage(messageId, message['text'] ?? '');
               },
             ),
           ListTile(
@@ -185,14 +184,15 @@ class _CommunityChatMessageListState extends State<CommunityChatMessageList> {
               _forwardSelectedMessages();
             },
           ),
-          // Only show delete if all selected messages are from current user
           if (_canDeleteSelectedMessages())
             ListTile(
               leading: const Icon(Icons.delete, color: Colors.red),
               title: const Text('Delete', style: TextStyle(color: Colors.red)),
               onTap: () {
                 Navigator.pop(context);
-                _showDeleteConfirmation(_messageController.selectedMessageIds);
+                for (final id in _messageController.selectedMessageIds) {
+                  widget.onDeleteMessage(id);
+                }
               },
             ),
         ],
@@ -224,144 +224,11 @@ class _CommunityChatMessageListState extends State<CommunityChatMessageList> {
     _messageController.clearSelection();
   }
   
-  void _showReplyDialog(Map<String, dynamic> message) {
-    final TextEditingController replyController = TextEditingController();
-    
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Reply'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: Colors.grey.shade200,
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    message['senderName'] ?? 'Unknown',
-                    style: const TextStyle(fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    message['text'] ?? '',
-                    maxLines: 3,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 16),
-            TextField(
-              controller: replyController,
-              decoration: const InputDecoration(
-                hintText: 'Type your reply...',
-                border: OutlineInputBorder(),
-              ),
-              maxLines: 3,
-              autofocus: true,
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () async {
-              final text = replyController.text.trim();
-              if (text.isNotEmpty) {
-                Navigator.pop(context);
-                try {
-                  await _messageController.replyToMessage(
-                    widget.communityId,
-                    message['id'],
-                    text,
-                  );
-                } catch (e) {
-                  if (mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('Error sending reply: $e')),
-                    );
-                  }
-                }
-              }
-            },
-            child: const Text('Send'),
-          ),
-        ],
-      ),
-    );
-  }
-  
-  void _showDeleteConfirmation(List<String> messageIds) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Delete Message'),
-        content: Text(
-          messageIds.length == 1
-              ? 'Are you sure you want to delete this message?'
-              : 'Are you sure you want to delete ${messageIds.length} messages?',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () async {
-              Navigator.pop(context);
-              try {
-                await _messageController.deleteSelectedMessages(widget.communityId);
-                if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Message(s) deleted')),
-                  );
-                }
-              } catch (e) {
-                if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Error deleting message(s): $e')),
-                  );
-                }
-              }
-            },
-            style: TextButton.styleFrom(foregroundColor: Colors.red),
-            child: const Text('Delete'),
-          ),
-        ],
-      ),
-    );
-  }
-  
-  void _showForwardDialog(Map<String, dynamic> message) {
-    // This would typically show a list of communities to forward to
-    // For simplicity, we'll just show a snackbar
-    _messageController.clearSelection();
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Forward feature coming soon')),
-      );
-    }
-  }
-  
   void _forwardSelectedMessages() {
-    // This would typically show a list of communities to forward to
-    // For simplicity, we'll just show a snackbar
-    _messageController.clearSelection();
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Forward feature coming soon')),
-      );
+    for (final id in _messageController.selectedMessageIds) {
+      widget.onForwardMessage(id);
     }
+    _messageController.clearSelection();
   }
 
   Widget _buildMessageContent(Map<String, dynamic> message, bool isCurrentUser) {
@@ -373,7 +240,6 @@ class _CommunityChatMessageListState extends State<CommunityChatMessageList> {
         ? (message['timestamp'] as Timestamp).toDate()
         : DateTime.now();
     
-    // If message has a reply reference
     final bool isReply = message['type'] == 'reply';
     final bool isForwarded = message['type'] == 'forwarded';
     
@@ -388,7 +254,6 @@ class _CommunityChatMessageListState extends State<CommunityChatMessageList> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Show reply info
           if (isReply) ...[
             Container(
               margin: const EdgeInsets.only(bottom: 8),
@@ -424,7 +289,6 @@ class _CommunityChatMessageListState extends State<CommunityChatMessageList> {
             ),
           ],
           
-          // Show forwarded info
           if (isForwarded) ...[
             Container(
               margin: const EdgeInsets.only(bottom: 8),
@@ -449,7 +313,6 @@ class _CommunityChatMessageListState extends State<CommunityChatMessageList> {
             ),
           ],
           
-          // Regular text message
           if (text.isNotEmpty && contentType != 'voice')
             Text(
               text,
@@ -459,7 +322,6 @@ class _CommunityChatMessageListState extends State<CommunityChatMessageList> {
               ),
             ),
           
-          // Voice message
           if (contentType == 'voice') ...[
             Consumer<MessageController>(
               builder: (context, controller, child) {
@@ -477,7 +339,7 @@ class _CommunityChatMessageListState extends State<CommunityChatMessageList> {
                   isCurrentUser: isCurrentUser,
                   isPlaying: isPlaying,
                   playbackProgress: playbackProgress,
-                  duration: const Duration(seconds: 30), // Placeholder, should come from message
+                  duration: const Duration(seconds: 30),
                   onPlayPause: () => _handleMediaTap(messageId, imageUrl ?? '', contentType),
                   isDownloaded: isDownloaded,
                   isDownloading: isDownloading,
@@ -486,8 +348,6 @@ class _CommunityChatMessageListState extends State<CommunityChatMessageList> {
               },
             ),
           ]
-          
-          // Images, videos, documents
           else if (imageUrl != null && contentType != 'voice') ...[
             if (text.isNotEmpty) 
               const SizedBox(height: 8),
@@ -529,8 +389,7 @@ class _CommunityChatMessageListState extends State<CommunityChatMessageList> {
   }
 
   @override
-Widget build(BuildContext context) {
-    // Use provided messages if available, otherwise use stream
+  Widget build(BuildContext context) {
     if (widget.messages != null) {
       _messages = widget.messages!;
       return _buildMessageList();
@@ -539,7 +398,7 @@ Widget build(BuildContext context) {
     return Stack(
       children: [
         StreamBuilder<List<Map<String, dynamic>>>(
-          stream: Provider.of<ChatController>(context).getCommunityMessagesStream(widget.communityId),
+          stream: Provider.of<ChatController>(context).getCommunityMediaMessagesStream(widget.communityId),
           builder: (context, snapshot) {
             if (snapshot.connectionState == ConnectionState.waiting) {
               return const Center(child: CircularProgressIndicator());
@@ -551,7 +410,6 @@ Widget build(BuildContext context) {
 
             _messages = snapshot.data ?? [];
             
-            // Scroll to bottom when messages update
             if (_messages.isNotEmpty) {
               WidgetsBinding.instance.addPostFrameCallback((_) {
                 _scrollToBottom();
@@ -559,14 +417,13 @@ Widget build(BuildContext context) {
             }
 
             if (_messages.isEmpty) {
-              return const Center(child: Text('No messages yet'));
+              return const Center(child: Text('No media resources found in this chat'));
             }
 
             return _buildMessageList();
           },
         ),
         
-        // Selection mode actions
         Consumer<MessageController>(
           builder: (context, controller, child) {
             if (controller.isSelectionMode) {
@@ -623,7 +480,6 @@ Widget build(BuildContext context) {
             final isSelected = messageController.isSelected(messageId);
             final isOptimistic = message['isOptimistic'] == true;
             
-            // For system messages (like welcome message)
             if (messageType == 'system') {
               return Center(
                 child: Container(
@@ -644,7 +500,6 @@ Widget build(BuildContext context) {
               );
             }
             
-            // Regular message bubbles
             return GestureDetector(
               onLongPress: isOptimistic ? null : () => _handleMessageLongPress(messageId),
               onTap: isOptimistic 
@@ -653,7 +508,7 @@ Widget build(BuildContext context) {
               child: MessageComponents.selectionOverlay(
                 isSelected: isSelected,
                 onTap: isOptimistic 
-                    ? () {} // Empty callback for optimistic messages
+                    ? () {} 
                     : () => _handleMessageLongPress(messageId),
                 child: Opacity(
                   opacity: isOptimistic ? 0.7 : 1.0,
@@ -703,5 +558,3 @@ Widget build(BuildContext context) {
     );
   }
 } 
- 
- 

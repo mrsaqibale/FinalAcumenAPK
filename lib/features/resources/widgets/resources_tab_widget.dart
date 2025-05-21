@@ -1,10 +1,18 @@
 import 'package:flutter/material.dart';
+import 'package:acumen/features/auth/controllers/auth_controller.dart';
+import 'package:acumen/features/chat/controllers/chat_controller.dart';
+import 'package:acumen/features/chat/models/chat_conversation_model.dart';
+import 'package:acumen/features/chat/models/conversation_extension.dart';
+import 'package:acumen/features/chat/screens/chat_detail_screen.dart';
+import 'package:acumen/features/resources/widgets/resource_community_chat_screen.dart';
+import 'package:acumen/theme/app_theme.dart';
 import 'package:provider/provider.dart';
+import 'package:acumen/utils/app_snackbar.dart';
+import 'package:acumen/features/resources/widgets/chat_list_widget.dart';
+import 'package:acumen/features/resources/widgets/student_list_widget.dart';
 import 'package:acumen/features/resources/controllers/resources_tab_controller.dart';
-import 'package:acumen/features/resources/models/resource_item.dart';
-import 'package:acumen/features/resources/widgets/resource_widgets.dart';
-import 'package:acumen/features/resources/screens/resource_detail_screen.dart';
-import 'dart:developer' as developer;
+import 'package:acumen/features/resources/widgets/chat_dialog_widgets.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 class ResourcesTabWidget extends StatefulWidget {
   const ResourcesTabWidget({super.key});
@@ -13,274 +21,313 @@ class ResourcesTabWidget extends StatefulWidget {
   State<ResourcesTabWidget> createState() => _ResourcesTabWidgetState();
 }
 
-class _ResourcesTabWidgetState extends State<ResourcesTabWidget> {
+class _ResourcesTabWidgetState extends State<ResourcesTabWidget> with SingleTickerProviderStateMixin {
+  String? selectedConversationId;
+  late TabController _tabController;
+  bool _isLoading = false;
+  List<Map<String, dynamic>> _allStudents = [];
   late ResourcesTabController _controller;
-  List<ResourceItem> _resources = [];
-  bool _isLoading = true;
-  String? _error;
-  bool _showFilters = false;
-
-  // Maps to hold categorized resources
-  Map<String, List<ResourceItem>> _categorizedResources = {
-    'Communities': [],
-    'Chats': [],
-    'Resources': [],
-  };
 
   @override
   void initState() {
     super.initState();
-    _controller = ResourcesTabController();
-    _initializeResources();
-  }
-
-  Future<void> _initializeResources() async {
-    try {
-      await _controller.checkUserRole(context);
-      final resources = await _controller.fetchResources();
-      
-      developer.log('Total resources fetched: ${resources.length}');
-      
-      // Categorize resources by source
-      final Map<String, List<ResourceItem>> categorized = {
-        'Communities': [],
-        'Chats': [],
-        'Resources': [],
-      };
-      
-      for (var resource in resources) {
-        developer.log('Resource: ${resource.title}, sourceType: ${resource.sourceType}, communityId: ${resource.communityId}, chatId: ${resource.chatId}');
-        
-        // Check if it's a community resource
-        if (resource.communityId != null && resource.communityId!.isNotEmpty) {
-          categorized['Communities']!.add(resource);
-          developer.log('Added to Communities: ${resource.title}');
-        } 
-        // Check if it's a chat resource
-        else if (resource.chatId != null && resource.chatId!.isNotEmpty) {
-          categorized['Chats']!.add(resource);
-          developer.log('Added to Chats: ${resource.title}');
-        } 
-        // Default to Resources category
-        else {
-          categorized['Resources']!.add(resource);
-          developer.log('Added to Resources: ${resource.title}');
-        }
-      }
-      
-      developer.log('Categorized resources: Communities=${categorized['Communities']!.length}, Chats=${categorized['Chats']!.length}, Resources=${categorized['Resources']!.length}');
-      
-      setState(() {
-        _resources = resources;
-        _categorizedResources = categorized;
-        _isLoading = false;
-        _error = null;
-      });
-    } catch (e) {
-      developer.log('Error loading resources: $e', error: e);
-      setState(() {
-        _error = 'Failed to load resources: $e';
-        _isLoading = false;
-      });
-    }
-  }
-
-  Future<void> _refreshResources() async {
-    setState(() {
-      _isLoading = true;
-      _error = null;
-    });
-    await _initializeResources();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return ChangeNotifierProvider.value(
-      value: _controller,
-      child: Consumer<ResourcesTabController>(
-        builder: (context, controller, _) {
-          if (_isLoading) {
-            return const ResourceLoadingIndicator();
-          }
-
-          if (_error != null) {
-            return ResourceErrorWidget(
-              message: _error!,
-              onRetry: _refreshResources,
-            );
-          }
-
-          if (_resources.isEmpty) {
-            return EmptyResourcesWidget(
-              message: 'No resources found. Try changing your filters.',
-            );
-          }
-
-          return RefreshIndicator(
-            onRefresh: _refreshResources,
-            child: CustomScrollView(
-              slivers: [
-                SliverToBoxAdapter(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const SizedBox(height: 16),
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 16),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            const Text(
-                              'Resources',
-                              style: TextStyle(
-                                fontSize: 20,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                            IconButton(
-                              icon: Icon(_showFilters ? Icons.filter_list_off : Icons.filter_list),
-                              onPressed: () {
-                                setState(() {
-                                  _showFilters = !_showFilters;
-                                });
-                              },
-                            ),
-                          ],
-                        ),
-                      ),
-                      if (_showFilters) ...[
-                        const SizedBox(height: 16),
-                        const Padding(
-                          padding: EdgeInsets.symmetric(horizontal: 16),
-                          child: Text(
-                            'Filter by Type',
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        ResourceTypeFilter(
-                          types: ['PDF', 'DOC', 'LINK', 'VIDEO', 'IMAGE', 'OTHER'],
-                          selectedType: controller.selectedResourceTypeFilter,
-                          onTypeSelected: (type) {
-                            controller.setResourceTypeFilter(type);
-                            _refreshResources();
-                          },
-                        ),
-                        const SizedBox(height: 16),
-                        const Padding(
-                          padding: EdgeInsets.symmetric(horizontal: 16),
-                          child: Text(
-                            'Filter by Source',
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        SourceFilter(
-                          sources: const ['All', 'Resources', 'Chats', 'Communities'],
-                          selectedSource: controller.selectedSourceFilter,
-                          onSourceSelected: (source) {
-                            controller.setSourceFilter(source);
-                            _refreshResources();
-                          },
-                        ),
-                        const SizedBox(height: 16),
-                      ],
-                    ],
-                  ),
-                ),
-                // Communities Section
-                ..._buildResourceSection('Communities', _categorizedResources['Communities']!, controller),
-                
-                // Chats Section
-                ..._buildResourceSection('Chats', _categorizedResources['Chats']!, controller),
-                
-                // Resources Section
-                ..._buildResourceSection('Resources', _categorizedResources['Resources']!, controller),
-              ],
-            ),
-          );
-        },
-      ),
-    );
-  }
-
-  List<Widget> _buildResourceSection(String title, List<ResourceItem> resources, ResourcesTabController controller) {
-    if (resources.isEmpty) {
-      return [];
-    }
-    
-    if (controller.selectedSourceFilter != 'All' && controller.selectedSourceFilter != title) {
-      return [];
-    }
-
-    return [
-      SliverToBoxAdapter(
-        child: Padding(
-          padding: const EdgeInsets.only(left: 16, top: 24, bottom: 8, right: 16),
-          child: Row(
-            children: [
-              Text(
-                title,
-                style: const TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const SizedBox(width: 8),
-              Text(
-                '(${resources.length})',
-                style: TextStyle(
-                  fontSize: 14,
-                  color: Colors.grey[600],
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-      SliverList(
-        delegate: SliverChildBuilderDelegate(
-          (context, index) {
-            final resource = resources[index];
-            final canEdit = controller.canEditResource(resource);
-            
-            return ResourceCard(
-              resource: resource,
-              isSelected: controller.selectedResourceId == resource.id,
-              canEdit: canEdit,
-              onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => ResourceDetailScreen(resource: resource),
-                  ),
-                );
-              },
-              onEdit: canEdit
-                  ? () => controller.editResource(context, resource)
-                  : null,
-              onDelete: canEdit
-                  ? () => controller.deleteResource(context, resource)
-                  : null,
-              onShare: () => controller.shareResource(context, resource),
-              onDetails: () => controller.showResourceDetails(context, resource),
-            );
-          },
-          childCount: resources.length,
-        ),
-      ),
-    ];
+    _tabController = TabController(length: 2, vsync: this);
+    _controller = ResourcesTabController(context);
+    _loadAllStudents();
   }
 
   @override
   void dispose() {
-    _controller.dispose();
+    _tabController.dispose();
     super.dispose();
   }
-} 
+
+  Future<void> _loadAllStudents() async {
+    setState(() {
+      _isLoading = true;
+    });
+    
+    try {
+      final authController = Provider.of<AuthController>(context, listen: false);
+      final students = await authController.getAllStudents();
+      
+      // Filter out current user
+      final currentUserId = authController.currentUser?.uid;
+      final filteredStudents = students.where((student) => student['id'] != currentUserId).toList();
+      
+      setState(() {
+        _allStudents = filteredStudents;
+        _isLoading = false;
+      });
+    } catch (e) {
+      setState(() {
+        _isLoading = false;
+      });
+      if (mounted) {
+        AppSnackbar.showError(
+          context: context,
+          message: 'Failed to load students: $e',
+        );
+      }
+    }
+  }
+
+  void _showSoloChatOptions(String conversationId) {
+    setState(() {
+      selectedConversationId = conversationId;
+    });
+
+    ChatDialogWidgets.showSoloChatOptions(
+      context: context,
+      conversationId: conversationId,
+      onDelete: (id) {
+        _controller.deleteConversation(id);
+      setState(() {
+        selectedConversationId = null;
+      });
+      },
+      onArchive: (id) {
+        _controller.archiveChat(id);
+        setState(() {
+          selectedConversationId = null;
+        });
+      },
+      onBlock: (id) {
+              // Implement block functionality
+        setState(() {
+          selectedConversationId = null;
+        });
+      },
+      );
+  }
+
+  void _showDeleteOptions(String conversationId, ChatConversation conversation) {
+    final authController = Provider.of<AuthController>(context, listen: false);
+    final isTeacher = authController.appUser?.isTeacher ?? false;
+    final isCreator = conversation.participantId == authController.currentUser?.uid;
+    
+    setState(() {
+      selectedConversationId = conversationId;
+    });
+
+    ChatDialogWidgets.showCommunityOptions(
+      context: context,
+      conversationId: conversationId,
+      conversation: conversation.toConversationModel(),
+      isTeacher: isTeacher,
+      isCreator: isCreator,
+      onDelete: (id) {
+        _controller.deleteConversation(id);
+        setState(() {
+          selectedConversationId = null;
+        });
+      },
+      onLeave: (id) {
+        _controller.leaveCommunity(id);
+        setState(() {
+          selectedConversationId = null;
+        });
+      },
+      onMute: (id) {
+        _controller.muteNotifications(id);
+        setState(() {
+          selectedConversationId = null;
+        });
+      },
+      onManageMembers: (conversation) async {
+        final authController = Provider.of<AuthController>(context, listen: false);
+        final students = await authController.getAllStudents();
+    
+        if (!mounted) return;
+    
+        await ChatDialogWidgets.showManageMembersDialog(
+          context: context,
+          conversation: conversation,
+          students: students,
+          currentMembers: [conversation.members.first],
+          onUpdateMembers: (communityId, memberIds) {
+            _controller.updateCommunityMembers(
+              communityId: communityId,
+              memberIds: memberIds,
+            );
+          },
+        );
+      },
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        TabBar(
+          controller: _tabController,
+          tabs: const [
+            Tab(text: 'MY CHATS'),
+            Tab(text: 'COMMUNITIES'),
+          ],
+          labelColor: Colors.black,
+          indicatorColor: Colors.black,
+          unselectedLabelColor: Colors.grey,
+          indicator: const UnderlineTabIndicator(
+            borderSide: BorderSide(color: Colors.black, width: 2.0),
+            insets: EdgeInsets.symmetric(horizontal: 10.0),
+          ),
+        ),
+        Expanded(
+          child: TabBarView(
+            controller: _tabController,
+            children: [
+              ChatListWidget(
+                selectedConversationId: selectedConversationId,
+                onShowSoloChatOptions: _showSoloChatOptions,
+                onShowDeleteOptions: _showDeleteOptions,
+              ),
+              _buildCommunitiesTab(),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildCommunitiesTab() {
+    final chatController = Provider.of<ChatController>(context);
+    
+    return StreamBuilder<List<Map<String, dynamic>>>(
+      stream: chatController.getUserCommunitiesStream(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+
+        if (snapshot.hasError) {
+          return Center(child: Text('Error: ${snapshot.error}'));
+        }
+
+        final communities = snapshot.data ?? [];
+        
+        if (communities.isEmpty) {
+          return const Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  Icons.group_off,
+                  size: 64,
+                  color: Colors.grey,
+                ),
+                SizedBox(height: 16),
+                Text(
+                  'No communities yet',
+                  style: TextStyle(
+                    fontSize: 18,
+                    color: Colors.grey,
+                  ),
+                ),
+                SizedBox(height: 8),
+                Text(
+                  'Join a community or create a new one',
+                  style: TextStyle(
+                    color: Colors.grey,
+                  ),
+                ),
+              ],
+            ),
+          );
+        }
+        
+        return ListView.builder(
+          padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
+          itemCount: communities.length,
+          itemBuilder: (context, index) {
+            final community = communities[index];
+            final isSelected = selectedConversationId == community['id'];
+            final communityId = community['id'] as String;
+            
+            // For each community, check if it has media content
+            return StreamBuilder<List<Map<String, dynamic>>>(
+              stream: chatController.getCommunityMediaMessagesStream(communityId),
+              builder: (context, messagesSnapshot) {
+                // If still loading or has error, show a placeholder
+                if (messagesSnapshot.connectionState == ConnectionState.waiting) {
+                  return const SizedBox.shrink();
+                }
+                
+                final mediaMessages = messagesSnapshot.data ?? [];
+                // Skip communities without media messages
+                if (mediaMessages.isEmpty) {
+                  return const SizedBox.shrink();
+                }
+                
+                // This community has media, show it in the list
+                return InkWell(
+                  onLongPress: () {
+                    final conversationModel = ChatConversation(
+                      id: communityId,
+                      participantId: community['createdBy'] as String,
+                      participantName: community['name'] as String,
+                      lastMessage: community['lastMessage'] as String? ?? '',
+                      lastMessageTime: (community['lastMessageAt'] as Timestamp).toDate(),
+                      hasUnreadMessages: ((community['unreadCount'] as int?) ?? 0) > 0,
+                      isGroup: true,
+                    );
+                    _showDeleteOptions(communityId, conversationModel);
+                  },
+                  child: Container(
+                    color: isSelected ? Colors.grey.withOpacity(0.1) : Colors.transparent,
+                    child: ListTile(
+                      leading: CircleAvatar(
+                        backgroundColor: AppTheme.primaryColor,
+                        child: Text(
+                          (community['name'] as String).substring(0, 1).toUpperCase(),
+                        ),
+                      ),
+                      title: Row(
+                        children: [
+                          Flexible(child: Text(community['name'] as String, overflow: TextOverflow.ellipsis)),
+                          const SizedBox(width: 4),
+                          Icon(Icons.insert_drive_file, size: 16, color: Colors.grey[600]),
+                        ],
+                      ),
+                      subtitle: Text('${mediaMessages.length} media resources'),
+                      trailing: community['unreadCount'] != null && (community['unreadCount'] as int) > 0
+                        ? Container(
+                            padding: const EdgeInsets.all(6),
+                            decoration: BoxDecoration(
+                              color: AppTheme.primaryColor,
+                              shape: BoxShape.circle,
+                            ),
+                            child: Text(
+                              '${community['unreadCount']}',
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 12,
+                              ),
+                            ),
+                          )
+                        : null,
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => ResourceCommunityChatScreen(
+                              communityId: communityId,
+                              communityName: community['name'] as String,
+                              memberIds: (community['members'] as List<dynamic>).cast<String>(),
+                              imageUrl: community['imageUrl'] as String?,
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                );
+              },
+            );
+          },
+        );
+      },
+    );
+  }
+}

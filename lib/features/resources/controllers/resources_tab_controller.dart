@@ -7,6 +7,9 @@ import 'package:acumen/features/resources/models/resource_item.dart';
 import 'package:acumen/features/resources/utils/resource_utils.dart';
 import 'package:acumen/utils/app_snackbar.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:acumen/features/chat/controllers/chat_controller.dart';
+import 'package:acumen/features/chat/models/conversation_model.dart';
+import 'package:acumen/features/chat/screens/chat_detail_screen.dart';
 
 class ResourcesTabController extends ChangeNotifier {
   String? selectedResourceId;
@@ -16,6 +19,13 @@ class ResourcesTabController extends ChangeNotifier {
   String? currentUserId;
   String? selectedResourceTypeFilter;
   String selectedSourceFilter = 'All';
+  final BuildContext context;
+  final AuthController authController;
+  final ChatController chatController;
+
+  ResourcesTabController(this.context)
+      : authController = Provider.of<AuthController>(context, listen: false),
+        chatController = Provider.of<ChatController>(context, listen: false);
 
   Future<void> checkUserRole(BuildContext context) async {
     final authController = Provider.of<AuthController>(context, listen: false);
@@ -395,5 +405,111 @@ class ResourcesTabController extends ChangeNotifier {
         (isMentor && resource.mentorId == currentUserId) || 
         (resource.sourceType == 'Chat' && resource.mentorId == currentUserId) ||
         (resource.sourceType == 'Community' && resource.mentorId == currentUserId);
+  }
+
+  Future<void> createNewChat(Map<String, dynamic> student) async {
+    final currentUser = authController.currentUser;
+    if (currentUser == null) return;
+
+    try {
+      // Create or get existing conversation
+      final conversation = await chatController.createOneToOneConversation(
+        participantId: student['id'],
+        participantName: student['name'],
+      );
+
+      if (conversation != null) {
+        // Navigate to chat
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => ChatDetailScreen(
+              conversationId: conversation.id,
+            ),
+          ),
+        );
+      }
+    } catch (e) {
+      AppSnackbar.showError(
+        context: context,
+        message: 'Failed to create chat: $e',
+      );
+    }
+  }
+
+  Future<void> deleteConversation(String conversationId) async {
+    try {
+      await chatController.deleteConversation(conversationId);
+      AppSnackbar.showInfo(
+        context: context,
+        message: 'Chat deleted',
+      );
+    } catch (e) {
+      AppSnackbar.showError(
+        context: context,
+        message: 'Failed to delete chat: $e',
+      );
+    }
+  }
+
+  Future<void> leaveCommunity(String conversationId) async {
+    try {
+      final success = await chatController.leaveCommunity(
+        communityId: conversationId,
+        userId: authController.currentUser!.uid,
+      );
+
+      if (success) {
+        AppSnackbar.showInfo(
+          context: context,
+          message: 'You left the community',
+        );
+      }
+    } catch (e) {
+      AppSnackbar.showError(
+        context: context,
+        message: 'Failed to leave community: $e',
+      );
+    }
+  }
+
+  Future<void> updateCommunityMembers({
+    required String communityId,
+    required List<String> memberIds,
+  }) async {
+    try {
+      final success = await chatController.updateCommunityMembers(
+        communityId: communityId,
+        memberIds: memberIds,
+      );
+
+      if (success) {
+        AppSnackbar.showSuccess(
+          context: context,
+          message: 'Community members updated',
+        );
+      }
+    } catch (e) {
+      AppSnackbar.showError(
+        context: context,
+        message: 'Failed to update community members: $e',
+      );
+    }
+  }
+
+  void archiveChat(String conversationId) {
+    // Implement archive functionality
+    AppSnackbar.showInfo(
+      context: context,
+      message: 'Chat archived',
+    );
+  }
+
+  void muteNotifications(String conversationId) {
+    // Implement mute functionality
+    AppSnackbar.showInfo(
+      context: context,
+      message: 'Notifications muted',
+    );
   }
 } 

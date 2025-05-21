@@ -104,33 +104,33 @@ class _SecuritySettingsScreenState extends State<SecuritySettingsScreen> {
                     leadingIcon: FontAwesomeIcons.clock,
                   ),
                   const Divider(),
-                  _buildSectionTitle('Password'),
-                  ListTile(
-                    leading: Container(
-                      width: 40,
-                      height: 40,
-                      decoration: BoxDecoration(
-                        color: AppTheme.primaryColor.withAlpha(26),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Icon(
-                        FontAwesomeIcons.key,
-                        color: AppTheme.primaryColor,
-                        size: 20,
-                      ),
-                    ),
-                    title: const Text('Change Password'),
-                    subtitle: const Text('Update your account password'),
-                    trailing: const Icon(Icons.chevron_right),
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => const CreateNewPasswordScreen(),
-                        ),
-                      );
-                    },
-                  ),
+                  // _buildSectionTitle('Password'),
+                  // ListTile(
+                  //   leading: Container(
+                  //     width: 40,
+                  //     height: 40,
+                  //     decoration: BoxDecoration(
+                  //       color: AppTheme.primaryColor.withAlpha(26),
+                  //       borderRadius: BorderRadius.circular(8),
+                  //     ),
+                  //     child: Icon(
+                  //       FontAwesomeIcons.key,
+                  //       color: AppTheme.primaryColor,
+                  //       size: 20,
+                  //     ),
+                  //   ),
+                  //   title: const Text('Change Password'),
+                  //   subtitle: const Text('Update your account password'),
+                  //   trailing: const Icon(Icons.chevron_right),
+                  //   onTap: () {
+                  //     Navigator.push(
+                  //       context,
+                  //       MaterialPageRoute(
+                  //         builder: (context) => const CreateNewPasswordScreen(),
+                  //       ),
+                  //     );
+                  //   },
+                  // ),
                  
                 ],
               ),

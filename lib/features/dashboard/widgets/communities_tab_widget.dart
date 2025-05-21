@@ -54,6 +54,7 @@ class CommunitiesTabWidget extends StatelessWidget {
                   ],
                 ),
               );
+            
             }
 
             return ListView.builder(
@@ -71,8 +72,10 @@ class CommunitiesTabWidget extends StatelessWidget {
             );
           },
         );
+      
       },
     );
+  
   }
 
   void _showDeleteCommunityConfirmation(BuildContext context, String communityId) {

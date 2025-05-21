@@ -285,7 +285,30 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                             title: const Text('Clear Chat', style: TextStyle(color: Colors.red)),
                             onTap: () {
                               Navigator.pop(context);
-                              // TODO: Implement clear chat
+                              showDialog(
+                                context: context,
+                                builder: (context) => AlertDialog(
+                                  title: const Text('Clear Chat'),
+                                  content: const Text('Are you sure you want to clear all messages? This action cannot be undone.'),
+                                  actions: [
+                                    TextButton(
+                                      onPressed: () => Navigator.pop(context),
+                                      child: const Text('Cancel'),
+                                    ),
+                                    TextButton(
+                                      onPressed: () {
+                                        Navigator.pop(context);
+                                        controller.clearChat();
+                                        AppSnackbar.showSuccess(
+                                          context: context,
+                                          message: 'Chat cleared successfully',
+                                        );
+                                      },
+                                      child: const Text('Clear', style: TextStyle(color: Colors.red)),
+                                    ),
+                                  ],
+                                ),
+                              );
                             },
                           ),
                         ],

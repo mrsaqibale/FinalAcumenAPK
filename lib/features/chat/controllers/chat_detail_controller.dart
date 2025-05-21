@@ -240,6 +240,9 @@ class ChatDetailController extends ChangeNotifier {
     final tempId = const Uuid().v4();
     
     try {
+      print("DEBUG: Starting file upload for conversation $conversationId");
+      print("DEBUG: File type: $type, File name: $fileName");
+      
       final uuid = const Uuid().v4();
       final extension = fileName.split('.').last;
       final storagePath = 'chats/$conversationId/$uuid.$extension';
@@ -336,13 +339,18 @@ class ChatDetailController extends ChangeNotifier {
             'type': type,
             'fileUrl': downloadUrl,
             'fileName': fileName,
+            'contentType': _getContentType(fileName, type),
           };
+          
+          print("DEBUG: Saving message with fileUrl: $downloadUrl");
           
           await FirebaseFirestore.instance
               .collection('chats')
               .doc(conversationId)
               .collection('messages')
               .add(messageData);
+          
+          print("DEBUG: Message saved successfully");
           
           if (conversationDoc.exists) {
             await FirebaseFirestore.instance
@@ -394,6 +402,7 @@ class ChatDetailController extends ChangeNotifier {
         }
       }
     } catch (e) {
+      print("DEBUG: Error uploading file: $e");
       // Clean up any temporary messages
       messages.removeWhere((msg) => msg.id == tempId);
       tempMessageIds.remove(tempId);
@@ -437,6 +446,43 @@ class ChatDetailController extends ChangeNotifier {
         return 'application/vnd.ms-powerpoint';
       default:
         return 'application/octet-stream';
+    }
+  }
+  
+  Future<void> clearChat() async {
+    try {
+      final batch = FirebaseFirestore.instance.batch();
+      
+      // Get all messages in this conversation
+      final messagesSnapshot = await FirebaseFirestore.instance
+          .collection('chats')
+          .doc(conversationId)
+          .collection('messages')
+          .get();
+      
+      // Add each message to the batch to be deleted
+      for (var doc in messagesSnapshot.docs) {
+        batch.delete(doc.reference);
+      }
+      
+      // Commit the batch operation
+      await batch.commit();
+      
+      // Update the conversation's last message
+      await FirebaseFirestore.instance
+          .collection('conversations')
+          .doc(conversationId)
+          .update({
+        'lastMessage': 'No messages',
+        'lastMessageAt': FieldValue.serverTimestamp(),
+      });
+      
+      // Clear the local messages list
+      messages.clear();
+      notifyListeners();
+    } catch (e) {
+      // Handle error
+      print('Error clearing chat: $e');
     }
   }
   

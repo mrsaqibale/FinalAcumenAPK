@@ -475,6 +475,62 @@ class ChatController extends ChangeNotifier {
   Stream<List<Map<String, dynamic>>> getUserCommunitiesStream() {
     return ChatService.getUserCommunitiesStream();
   }
+  
+  // Get community messages with only media content for resources tab
+  Stream<List<Map<String, dynamic>>> getCommunityMediaMessagesStream(String communityId) {
+    return ChatService.getCommunityMessagesStream(communityId)
+        .map((messages) => messages.where((message) {
+              // Check if this message has media content
+              final String contentType = message['contentType'] as String? ?? 'text';
+              final String? imageUrl = message['imageUrl'] as String?;
+              
+              // Return only messages with media content (not text or voice)
+              return (contentType != 'text' && contentType != 'voice' && 
+                     imageUrl != null && imageUrl.isNotEmpty);
+            }).toList());
+  }
+  
+  // Get solo chat messages with only media content for My Chats tab in resources
+  Stream<List<ChatMessage>> getSoloMediaMessagesStream(String conversationId) {
+    if (!_messageSubscriptions.containsKey(conversationId)) {
+      // Return empty stream initially
+      return Stream.value([]);
+    }
+    
+    return ChatService.getMessagesStream(conversationId)
+        .map((messages) => messages.where((message) {
+              // Check if this message has media content (fileUrl is not null)
+              return message.fileUrl != null && message.fileUrl!.isNotEmpty;
+            }).toList());
+  }
+  
+  // Check if a conversation has any media messages
+  Future<bool> conversationHasMediaMessages(String conversationId) async {
+    try {
+      print("DEBUG: Checking media messages for conversation $conversationId");
+      
+      // Query Firestore directly for messages with fileUrl
+      final messagesSnapshot = await FirebaseFirestore.instance
+          .collection('chats')
+          .doc(conversationId)
+          .collection('messages')
+          .where('fileUrl', isNotEqualTo: null)
+          .limit(1)
+          .get();
+
+      final hasMedia = messagesSnapshot.docs.isNotEmpty;
+      print("DEBUG: Conversation $conversationId has media: $hasMedia");
+      
+      if (hasMedia) {
+        print("DEBUG: Found media message in conversation $conversationId");
+      }
+      
+      return hasMedia;
+    } catch (e) {
+      print("DEBUG: Error checking media messages for conversation $conversationId: $e");
+      return false;
+    }
+  }
 
   // Create or get existing one-to-one conversation
   Future<ChatConversation?> createOneToOneConversation({

@@ -1,3 +1,5 @@
+import 'package:acumen/features/onboarding/screens/onboarding_screen.dart';
+import 'package:acumen/features/onboarding/screens/splash_screen.dart';
 import 'package:flutter/material.dart';
 import '../features/auth/screens/login_screen.dart';
 import '../features/auth/screens/signup_screen.dart';
@@ -12,8 +14,7 @@ import '../features/business/screens/career_counseling_screen.dart';
 import '../features/profile/screens/mentors_screen.dart';
 import '../features/chat/screens/chats_screen.dart';
 import '../features/notification/screens/notifications_screen.dart';
-import '../features/onboard/screens/splash_screen.dart';
-import '../features/onboard/screens/onboarding_screen.dart';
+
 import '../features/dashboard/screens/admin_dashboard_screen.dart';
 import '../features/dashboard/screens/mentor_dashboard_screen.dart';
 import '../features/auth/screens/mentor_approval_screen.dart';
