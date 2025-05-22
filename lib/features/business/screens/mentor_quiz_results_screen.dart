@@ -1,7 +1,6 @@
 import 'package:acumen/theme/app_theme.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:timeago/timeago.dart' as timeago;
 import 'package:acumen/features/business/controllers/quiz_controller.dart';
 import 'package:acumen/features/business/screens/add_quiz_screen.dart';
 

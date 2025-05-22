@@ -7,6 +7,7 @@ import 'package:acumen/features/settings/controllers/settings_controller.dart';
 import 'package:flutter/material.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:provider/provider.dart';
+import 'package:flutter/foundation.dart';
 
 class NotificationsScreen extends StatefulWidget {
   const NotificationsScreen({super.key});
@@ -17,20 +18,80 @@ class NotificationsScreen extends StatefulWidget {
 
 class _NotificationsScreenState extends State<NotificationsScreen> {
   bool _areNotificationsEnabled = true;
+  bool _isInitialized = false;
+  bool _isLoading = true;
 
   @override
   void initState() {
     super.initState();
-    // Load notifications and events when screen opens
-    WidgetsBinding.instance.addPostFrameCallback((_) async {
+    // Use post-frame callback to avoid context issues during initialization
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _initializeNotifications();
+    });
+  }
+
+  Future<void> _initializeNotifications() async {
+    if (_isInitialized) return;
+    
+    try {
       // Check if notifications are enabled in settings
       final areEnabled = await SettingsController.areNotificationsEnabled();
+      if (!mounted) return;
+      
       setState(() {
         _areNotificationsEnabled = areEnabled;
+        _isLoading = areEnabled; // Only show loading if notifications are enabled
       });
       
-      if (!_areNotificationsEnabled) return;
+      if (!_areNotificationsEnabled) {
+        setState(() {
+          _isInitialized = true;
+          _isLoading = false;
+        });
+        return;
+      }
       
+      final notificationController = Provider.of<NotificationController>(context, listen: false);
+      final eventController = Provider.of<EventController>(context, listen: false);
+      
+      // Load events and notifications in parallel
+      try {
+        await Future.wait([
+          notificationController.loadNotifications(),
+          eventController.loadEvents(),
+        ]);
+        
+        if (!mounted) return;
+        
+        // Sync notifications with active events
+        await notificationController.syncWithEvents(eventController.activeEvents);
+      } catch (e) {
+        if (kDebugMode) {
+          print('Error loading notifications or events: $e');
+        }
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        print('Error initializing notifications: $e');
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isInitialized = true;
+          _isLoading = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _refreshNotifications() async {
+    if (!_areNotificationsEnabled) return;
+    
+    setState(() {
+      _isLoading = true;
+    });
+    
+    try {
       final notificationController = Provider.of<NotificationController>(context, listen: false);
       final eventController = Provider.of<EventController>(context, listen: false);
       
@@ -40,31 +101,21 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         eventController.loadEvents(),
       ]);
       
+      if (!mounted) return;
+      
       // Sync notifications with active events
       await notificationController.syncWithEvents(eventController.activeEvents);
-    });
-  }
-
-  Future<void> _refreshNotifications() async {
-    // Check if notifications are enabled before refreshing
-    final areEnabled = await SettingsController.areNotificationsEnabled();
-    setState(() {
-      _areNotificationsEnabled = areEnabled;
-    });
-    
-    if (!_areNotificationsEnabled) return;
-    
-    final notificationController = Provider.of<NotificationController>(context, listen: false);
-    final eventController = Provider.of<EventController>(context, listen: false);
-    
-    // Load events and notifications in parallel
-    await Future.wait([
-      notificationController.loadNotifications(),
-      eventController.loadEvents(),
-    ]);
-    
-    // Sync notifications with active events
-    await notificationController.syncWithEvents(eventController.activeEvents);
+    } catch (e) {
+      if (kDebugMode) {
+        print('Error refreshing notifications: $e');
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
   }
 
   void _navigateToDashboard() {
@@ -84,6 +135,14 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (!_isInitialized) {
+      return const Scaffold(
+        body: Center(
+          child: CircularProgressIndicator(),
+        ),
+      );
+    }
+
     return Scaffold(
       backgroundColor: AppTheme.primaryColor,
       appBar: AppBar(
@@ -137,65 +196,63 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         clipBehavior: Clip.antiAlias,
         child: !_areNotificationsEnabled 
             ? _buildNotificationsDisabledMessage()
-            : Consumer<NotificationController>(
-                builder: (context, notificationController, child) {
-                  final notifications = notificationController.notifications;
-                  
-                  if (notificationController.isLoading) {
-                    return const Center(child: CircularProgressIndicator());
-                  }
-                  
-                  if (notifications.isEmpty) {
-                    return Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(
-                            Icons.notifications_off,
-                            size: 48,
-                            color: Colors.grey[400],
+            : _isLoading
+                ? const Center(child: CircularProgressIndicator())
+                : Consumer<NotificationController>(
+                    builder: (context, notificationController, child) {
+                      final notifications = notificationController.notifications;
+                      
+                      if (notifications.isEmpty) {
+                        return Center(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                Icons.notifications_off,
+                                size: 48,
+                                color: Colors.grey[400],
+                              ),
+                              const SizedBox(height: 16),
+                              Text(
+                                'No Notifications',
+                                style: TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.grey[600],
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              Text(
+                                'You don\'t have any notifications yet',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  color: Colors.grey[500],
+                                ),
+                              ),
+                            ],
                           ),
-                          const SizedBox(height: 16),
-                          Text(
-                            'No Notifications',
-                            style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.grey[600],
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          Text(
-                            'You don\'t have any notifications yet',
-                            style: TextStyle(
-                              fontSize: 14,
-                              color: Colors.grey[500],
-                            ),
-                          ),
-                        ],
-                      ),
-                    );
-                  }
-                  
-                  return RefreshIndicator(
-                    onRefresh: _refreshNotifications,
-                    child: ListView.builder(
-                      padding: const EdgeInsets.all(16),
-                      itemCount: notifications.length,
-                      itemBuilder: (context, index) {
-                        final notification = notifications[index];
-                        return NotificationCardWidget(
-                          notification: notification,
-                          onMarkAsRead: () => notificationController.markAsRead(notification.id),
-                          onDelete: () => notificationController.deleteNotification(notification.id),
                         );
-                      },
-                    ),
-                  );
-                },
-              ),
+                      }
+                      
+                      return RefreshIndicator(
+                        onRefresh: _refreshNotifications,
+                        child: ListView.builder(
+                          padding: const EdgeInsets.all(16),
+                          itemCount: notifications.length,
+                          physics: const AlwaysScrollableScrollPhysics(),
+                          itemBuilder: (context, index) {
+                            final notification = notifications[index];
+                            return NotificationCardWidget(
+                              notification: notification,
+                              onMarkAsRead: () => notificationController.markAsRead(notification.id),
+                              onDelete: () => notificationController.deleteNotification(notification.id),
+                            );
+                          },
+                        ),
+                      );
+                    },
+                  ),
       ),
-     
     );
   }
 

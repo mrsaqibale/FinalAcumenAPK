@@ -4,15 +4,19 @@ import 'package:flutter/foundation.dart' show defaultTargetPlatform, TargetPlatf
 /// Default Firebase configuration options for the current platform
 class DefaultFirebaseOptions {
   static FirebaseOptions get currentPlatform {
-    // Since we don't have the actual Firebase configuration,
-    // we'll use a generic configuration that will be replaced
-    // with the actual values when Firebase.initializeApp is called
-    // without options parameter
-    return const FirebaseOptions(
-      apiKey: 'placeholder-api-key',
-      appId: 'placeholder-app-id',
-      messagingSenderId: 'placeholder-sender-id',
-      projectId: 'placeholder-project-id',
-    );
+    switch (defaultTargetPlatform) {
+      case TargetPlatform.android:
+        return const FirebaseOptions(
+          apiKey: 'AIzaSyCc-2MB4pItAmLQREVp7S6-IEMMhWdNTSo',
+          appId: '1:320837688409:android:690ee6a94453e63bdbe548',
+          messagingSenderId: '320837688409',
+          projectId: 'acumen-connectify-cb686',
+          storageBucket: 'acumen-connectify-cb686.firebasestorage.app',
+        );
+      default:
+        throw UnsupportedError(
+          'DefaultFirebaseOptions are not supported for this platform.',
+        );
+    }
   }
 } 

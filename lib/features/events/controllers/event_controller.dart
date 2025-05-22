@@ -103,22 +103,46 @@ class EventController extends ChangeNotifier {
   Future<void> loadEvents() async {
     _setLoading(true);
     try {
+      if (kDebugMode) {
+        print('Loading events from Firestore...');
+      }
+      
       final snapshot = await _firestore.collection('events').orderBy('startDate', descending: true).get();
       
-      _events = snapshot.docs
-          .map((doc) => EventModel.fromMap(doc.data(), doc.id))
-          .toList();
+      if (kDebugMode) {
+        print('Got ${snapshot.docs.length} events from Firestore');
+      }
+      
+      _events = [];
+      
+      for (final doc in snapshot.docs) {
+        try {
+          final data = doc.data();
+          if (kDebugMode) {
+            print('Processing event ${doc.id}: ${data['title']}');
+          }
+          
+          final event = EventModel.fromMap(data, doc.id);
+          _events.add(event);
+        } catch (e) {
+          if (kDebugMode) {
+            print('Error processing event ${doc.id}: $e');
+            print('Event data: ${doc.data()}');
+          }
+        }
+      }
       
       _filterEvents();
       
       if (kDebugMode) {
-        print('Loaded ${_events.length} events');
+        print('Successfully loaded ${_events.length} events');
         print('Active events: ${_activeEvents.length}');
         print('Past events: ${_pastEvents.length}');
       }
     } catch (e) {
       if (kDebugMode) {
         print('Error loading events: $e');
+        print('Stack trace: ${StackTrace.current}');
       }
     } finally {
       _setLoading(false);
@@ -144,7 +168,10 @@ class EventController extends ChangeNotifier {
   Future<bool> createEvent(EventModel event) async {
     _setLoading(true);
     try {
-      await _firestore.collection('events').add(event.toMap());
+      // Convert DateTime fields to Timestamp before saving
+      final eventMap = event.toMap();
+      
+      await _firestore.collection('events').add(eventMap);
       await loadEvents();
       // Check for expired events immediately after creating a new event
       _checkForExpiredEvents();
@@ -163,7 +190,10 @@ class EventController extends ChangeNotifier {
   Future<bool> updateEvent(EventModel event) async {
     _setLoading(true);
     try {
-      await _firestore.collection('events').doc(event.id).update(event.toMap());
+      // Convert DateTime fields to Timestamp before saving
+      final eventMap = event.toMap();
+      
+      await _firestore.collection('events').doc(event.id).update(eventMap);
       await loadEvents();
       // Check for expired events immediately after updating an event
       _checkForExpiredEvents();

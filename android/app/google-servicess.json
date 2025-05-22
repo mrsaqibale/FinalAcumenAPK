@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "320837688409",
+    "project_id": "acumen-connectify-cb686",
+    "storage_bucket": "acumen-connectify-cb686.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:320837688409:android:690ee6a94453e63bdbe548",
+        "android_client_info": {
+          "package_name": "com.example.acumen"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCc-2MB4pItAmLQREVp7S6-IEMMhWdNTSo"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

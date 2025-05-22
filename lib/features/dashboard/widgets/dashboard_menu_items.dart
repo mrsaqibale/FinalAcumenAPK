@@ -27,7 +27,7 @@ class DashboardMenuItems extends StatelessWidget {
         },
       },
       {
-        'title': 'Mentorship',
+        'title': 'Skill',
         'subtitle': 'Connect to get guidance',
         'icon': 'assets/images/icons/chartboard.png',
         'onTap': () {

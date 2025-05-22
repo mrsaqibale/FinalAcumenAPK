@@ -10,6 +10,7 @@ import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:photo_view/photo_view.dart';
+import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 
 class CommunityChatMessageList extends StatefulWidget {
   final String communityId;
@@ -672,13 +673,27 @@ Widget build(BuildContext context) {
                           if (!isCurrentUser)
                             Padding(
                               padding: const EdgeInsets.only(left: 12, bottom: 4),
-                              child: Text(
-                                message['senderName'] as String? ?? 'Unknown',
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.grey.shade700,
-                                ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(
+                                    message['senderName'] as String? ?? 'Unknown',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.grey.shade700,
+                                    ),
+                                  ),
+                                  if (message['senderHasVerifiedSkills'] == true)
+                                    Padding(
+                                      padding: const EdgeInsets.only(left: 4.0),
+                                      child: Icon(
+                                        FontAwesomeIcons.solidCircleCheck,
+                                        color: Colors.blue,
+                                        size: 12,
+                                      ),
+                                    ),
+                                ],
                               ),
                             ),
                           GestureDetector(

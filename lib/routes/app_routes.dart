@@ -14,6 +14,7 @@ import '../features/business/screens/career_counseling_screen.dart';
 import '../features/profile/screens/mentors_screen.dart';
 import '../features/chat/screens/chats_screen.dart';
 import '../features/notification/screens/notifications_screen.dart';
+import '../features/profile/screens/new_user_profile_screen.dart';
 
 import '../features/dashboard/screens/admin_dashboard_screen.dart';
 import '../features/dashboard/screens/mentor_dashboard_screen.dart';
@@ -41,6 +42,7 @@ class AppRoutes {
   static const String mentorLogin = '/mentor-login';
   static const String mentorApproval = '/mentor-approval';
   static const String settings = '/settings';
+  static const String profile = '/profile';
 
   // Get all routes
   static Map<String, WidgetBuilder> getRoutes(bool onboardingComplete) {
@@ -62,6 +64,7 @@ class AppRoutes {
       mentorApproval: (context) => MentorApprovalScreen(email: Provider.of<AuthController>(context, listen: false).currentUser?.email ?? ''),
       emailConfirmation: (context) => EmailConfirmationScreen(email: Provider.of<AuthController>(context, listen: false).currentUser?.email ?? ''),
       settings: (context) => const SettingsScreen(),
+      profile: (context) => const NewUserProfileScreen(),
     };
   }
 

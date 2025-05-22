@@ -7,8 +7,6 @@ import 'package:provider/provider.dart';
 import 'package:acumen/features/business/controllers/quiz_controller.dart';
 import 'package:acumen/features/business/widgets/quiz_intro_card.dart';
 import 'package:flutter/foundation.dart';
-import 'package:url_launcher/url_launcher.dart';
-import 'package:youtube_player_flutter/youtube_player_flutter.dart';
 
 class CareerCounselingScreen extends StatefulWidget {
   const CareerCounselingScreen({super.key});
@@ -234,7 +232,7 @@ class _CareerCounselingScreenState extends State<CareerCounselingScreen> {
                           // Extract video ID
                           String videoId = "";
                           if (hasVideo) {
-                            final extractedId = _extractVideoId(videoUrl!);
+                            final extractedId = _extractVideoId(videoUrl);
                             if (extractedId != null) {
                               videoId = extractedId;
                             }

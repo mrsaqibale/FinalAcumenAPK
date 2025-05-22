@@ -1,5 +1,3 @@
-import 'package:acumen/features/auth/controllers/auth_controller.dart';
-import 'package:acumen/features/chat/controllers/chat_controller.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:record/record.dart';
@@ -7,7 +5,6 @@ import 'package:path_provider/path_provider.dart';
 import 'package:file_picker/file_picker.dart';
 import 'dart:io';
 import 'dart:async';
-import 'package:provider/provider.dart';
 
 class ChatInputController extends ChangeNotifier {
   final TextEditingController messageController = TextEditingController();

@@ -6,11 +6,10 @@ import 'package:acumen/features/profile/controllers/user_controller.dart';
 import 'package:acumen/features/profile/widgets/user_form.dart';
 import 'package:acumen/features/dashboard/widgets/admin/admin_user_list.dart';
 import 'package:acumen/features/dashboard/widgets/admin/admin_mentor_list.dart';
+import 'package:acumen/features/dashboard/widgets/admin/admin_premium_skills_tab.dart';
 import 'package:acumen/features/dashboard/widgets/logout_dialog_widget.dart';
-import 'package:acumen/features/events/screens/admin_events_screen.dart';
 import 'package:acumen/features/events/controllers/event_controller.dart';
 import 'package:acumen/features/events/models/event_model.dart';
-import 'package:acumen/features/events/widgets/add_event_form.dart';
 import 'package:acumen/features/events/widgets/admin/admin_delete_event_dialog.dart';
 import 'package:acumen/features/events/widgets/admin/admin_event_details_dialog.dart';
 import 'package:acumen/features/events/widgets/admin/admin_event_list.dart';
@@ -47,7 +46,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Ticker
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 4, vsync: this);
+    _tabController = TabController(length: 5, vsync: this);
     _eventsTabController = TabController(length: 2, vsync: this);
     
     // Use addPostFrameCallback to ensure state updates happen after build
@@ -118,6 +117,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Ticker
         return 'student';
       case 3:
         return ''; // Events tab
+      case 4:
+        return ''; // Premium Skills tab
       default:
         return 'student';
     }
@@ -235,6 +236,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Ticker
                     Tab(text: 'Mentors'),
                     Tab(text: 'Students'),
                     Tab(text: 'Events'),
+                    Tab(text: 'Premium Skills'),
                   ],
                 ),
               ),
@@ -314,6 +316,9 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Ticker
                                 ),
                               ],
                             ),
+                            
+                            // Premium Skills Tab
+                            const AdminPremiumSkillsTab(),
                           ],
                         );
                       },
@@ -323,7 +328,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Ticker
               ),
             ],
           ),
-      floatingActionButton: FloatingActionButton(
+      floatingActionButton: _tabController.index == 4 ? null : FloatingActionButton(
         onPressed: () {
           if (_tabController.index == 3) {
             _showAddEventDialog();

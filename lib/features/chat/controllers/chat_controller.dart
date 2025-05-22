@@ -10,10 +10,11 @@ import 'package:provider/provider.dart';
 import 'package:flutter/material.dart';
 import 'dart:async';
 import 'dart:io';
-import 'package:rxdart/rxdart.dart';
+
 import 'package:flutter/widgets.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:uuid/uuid.dart';
 
 class ChatController extends ChangeNotifier {
   bool _isLoading = true;
@@ -26,6 +27,11 @@ class ChatController extends ChangeNotifier {
   // Stream subscriptions for real-time updates
   StreamSubscription? _conversationsSubscription;
   Map<String, StreamSubscription> _messageSubscriptions = {};
+  
+  // Firestore references
+  final _firestore = FirebaseFirestore.instance;
+  final _usersCollection = FirebaseFirestore.instance.collection('users');
+  final _communitiesCollection = FirebaseFirestore.instance.collection('communities');
   
   bool get isLoading => _isLoading;
   String? get error => _error;
@@ -252,6 +258,7 @@ class ChatController extends ChangeNotifier {
     String? description,
     required List<String> memberIds,
     String? imageUrl,
+    bool isPublic = false,
   }) async {
     try {
       _isLoading = true;
@@ -262,6 +269,7 @@ class ChatController extends ChangeNotifier {
         description: description,
         memberIds: memberIds,
         imageUrl: imageUrl,
+        isPublic: isPublic,
       );
       
       // No need to manually reload as subscription will handle it
@@ -431,33 +439,54 @@ class ChatController extends ChangeNotifier {
   // Send a message to community
   Future<void> sendCommunityMessage({
     required String communityId,
-    String? text,
-    String? imageUrl,
-    File? mediaFile,
-    String? mediaType,
+    required String text,
+    String? fileUrl,
+    String? fileType,
+    String? replyToMessageId,
+    String? replyToSenderName,
+    String? replyToText,
+    String? forwardedFromName,
   }) async {
     try {
-      if (mediaFile != null) {
-        // Upload the media file to Firebase Storage and get URL
-        final String mediaUrl = await ChatService.uploadMediaFile(
-          file: mediaFile, 
-          path: 'community_media/$communityId/${DateTime.now().millisecondsSinceEpoch}'
-        );
-        
-        // Send message with media URL
-        await ChatService.sendCommunityMessage(
-          communityId: communityId,
-          text: text ?? '',
-          imageUrl: mediaUrl,
-          contentType: mediaType,
-        );
-      } else {
-        await ChatService.sendCommunityMessage(
-          communityId: communityId,
-          text: text ?? '',
-          imageUrl: imageUrl,
-        );
+      final currentUser = FirebaseAuth.instance.currentUser;
+      if (currentUser == null) {
+        throw Exception('User not authenticated');
       }
+      
+      // Get current user's data including verified skills status
+      final userDoc = await _usersCollection.doc(currentUser.uid).get();
+      final userData = userDoc.data() as Map<String, dynamic>;
+      final hasVerifiedSkills = userData['hasVerifiedSkills'] ?? false;
+      
+      // Create message document
+      final messageData = {
+        'id': const Uuid().v4(),
+        'text': text,
+        'senderId': currentUser.uid,
+        'senderName': userData['name'] ?? 'Unknown',
+        'senderHasVerifiedSkills': hasVerifiedSkills,
+        'timestamp': FieldValue.serverTimestamp(),
+        'type': 'message',
+        'fileUrl': fileUrl,
+        'fileType': fileType,
+        'replyToMessageId': replyToMessageId,
+        'replyToSenderName': replyToSenderName,
+        'replyToText': replyToText,
+        'forwardedFromName': forwardedFromName,
+      };
+      
+      // Add message to community
+      await _communitiesCollection
+          .doc(communityId)
+          .collection('messages')
+          .add(messageData);
+      
+      // Update community's last message
+      await _communitiesCollection.doc(communityId).update({
+        'lastMessage': text,
+        'lastMessageSender': userData['name'] ?? 'Unknown',
+        'lastMessageAt': FieldValue.serverTimestamp(),
+      });
     } catch (e) {
       if (kDebugMode) {
         print('Error sending community message: $e');

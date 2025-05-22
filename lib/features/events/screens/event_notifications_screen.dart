@@ -1,11 +1,13 @@
 import 'package:acumen/features/events/controllers/event_controller.dart';
 import 'package:acumen/features/events/models/event_model.dart';
+import 'package:acumen/features/events/screens/event_detail_screen.dart';
 import 'package:acumen/features/events/widgets/event_notification_item.dart';
 import 'package:acumen/features/notification/controllers/notification_controller.dart';
 import 'package:acumen/theme/app_theme.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
+import 'package:flutter/foundation.dart';
 
 class EventNotificationsScreen extends StatefulWidget {
   const EventNotificationsScreen({super.key});
@@ -16,25 +18,100 @@ class EventNotificationsScreen extends StatefulWidget {
 
 class _EventNotificationsScreenState extends State<EventNotificationsScreen> {
   bool _isLoading = true;
+  bool _isInitialized = false;
 
   @override
   void initState() {
     super.initState();
-    _loadEvents();
+    // Use post-frame callback to avoid context issues during initialization
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _initializeEvents();
+    });
+  }
+
+  Future<void> _initializeEvents() async {
+    if (_isInitialized) return;
+
+    try {
+      if (!mounted) return;
+      final eventController = Provider.of<EventController>(context, listen: false);
+      final notificationController = Provider.of<NotificationController>(context, listen: false);
+      
+      await eventController.loadEvents();
+      
+      if (!mounted) return;
+      
+      // Check for expired events
+      try {
+        await eventController.checkForExpiredEvents(context);
+      } catch (e) {
+        if (kDebugMode) {
+          print('Error checking for expired events: $e');
+        }
+      }
+      
+      if (!mounted) return;
+      
+      // Sync with notifications
+      try {
+        await notificationController.syncWithEvents(eventController.activeEvents);
+      } catch (e) {
+        if (kDebugMode) {
+          print('Error syncing with notifications: $e');
+        }
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        print('Error loading events: $e');
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+          _isInitialized = true;
+        });
+      }
+    }
   }
 
   Future<void> _loadEvents() async {
+    if (!mounted) return;
+    
+    setState(() {
+      _isLoading = true;
+    });
+    
     try {
       final eventController = Provider.of<EventController>(context, listen: false);
       final notificationController = Provider.of<NotificationController>(context, listen: false);
       
       await eventController.loadEvents();
       
+      if (!mounted) return;
+      
       // Check for expired events
-      await eventController.checkForExpiredEvents(context);
+      try {
+        await eventController.checkForExpiredEvents(context);
+      } catch (e) {
+        if (kDebugMode) {
+          print('Error checking for expired events: $e');
+        }
+      }
+      
+      if (!mounted) return;
       
       // Sync with notifications
-      await notificationController.syncWithEvents(eventController.activeEvents);
+      try {
+        await notificationController.syncWithEvents(eventController.activeEvents);
+      } catch (e) {
+        if (kDebugMode) {
+          print('Error syncing with notifications: $e');
+        }
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        print('Error reloading events: $e');
+      }
     } finally {
       if (mounted) {
         setState(() {
@@ -45,60 +122,29 @@ class _EventNotificationsScreenState extends State<EventNotificationsScreen> {
   }
 
   void _showEventDetails(EventModel event) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text(event.title, style: const TextStyle(fontWeight: FontWeight.bold)),
-        content: SizedBox(
-          width: double.maxFinite,
-          child: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _buildInfoRow('Venue', event.venue),
-                const SizedBox(height: 16),
-                _buildInfoRow('Start Date', DateFormat('MMM dd, yyyy hh:mm a').format(event.startDate)),
-                const SizedBox(height: 8),
-                _buildInfoRow('End Date', DateFormat('MMM dd, yyyy hh:mm a').format(event.endDate)),
-                const SizedBox(height: 16),
-                const Text('Description', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                const SizedBox(height: 8),
-                Text(event.description),
-              ],
-            ),
+    try {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => EventDetailScreen(
+            eventId: event.id,
+            event: {
+              'title': event.title,
+              'description': event.description,
+              'venue': event.venue,
+              'startDate': event.startDate.millisecondsSinceEpoch,
+              'endDate': event.endDate.millisecondsSinceEpoch,
+              'isActive': event.isActive,
+              'imageUrl': event.imageUrl,
+            },
           ),
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            style: TextButton.styleFrom(foregroundColor: AppTheme.primaryColor),
-            child: const Text('Close'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildInfoRow(String label, String value) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        SizedBox(
-          width: 100,
-          child: Text(
-            label,
-            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-          ),
-        ),
-        Expanded(
-          child: Text(
-            value,
-            style: const TextStyle(fontSize: 16),
-          ),
-        ),
-      ],
-    );
+      );
+    } catch (e) {
+      if (kDebugMode) {
+        print('Error navigating to event details: $e');
+      }
+    }
   }
 
   @override

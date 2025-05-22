@@ -9,7 +9,6 @@ import 'package:firebase_storage/firebase_storage.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:uuid/uuid.dart';
 import 'package:flutter/foundation.dart';
-import 'package:path/path.dart' as path;
 
 class ChatService {
   static const String _conversationsBoxName = 'conversations';
@@ -168,12 +167,14 @@ class ChatService {
       throw Exception('ChatService not initialized');
     }
     
-    // Check if participant is active
+    // Check if participant is active and has verified skills
+    bool participantHasVerifiedSkills = false;
     try {
       final participantDoc = await _usersCollection.doc(participantId).get();
       if (participantDoc.exists) {
         final participantData = participantDoc.data() as Map<String, dynamic>;
         final bool isActive = participantData['isActive'] ?? true;
+        participantHasVerifiedSkills = participantData['hasVerifiedSkills'] ?? false;
         
         if (!isActive) {
           throw Exception('Cannot create conversation with inactive user');
@@ -209,6 +210,7 @@ class ChatService {
       lastMessage: '',
       lastMessageTime: DateTime.now(),
       isGroup: isGroup,
+      participantHasVerifiedSkills: participantHasVerifiedSkills,
     );
     
     // Create message box
@@ -392,6 +394,7 @@ class ChatService {
     String? description,
     required List<String> memberIds,
     String? imageUrl,
+    bool isPublic = false,
   }) async {
     final currentUser = _auth.currentUser;
     if (currentUser == null) {
@@ -407,9 +410,9 @@ class ChatService {
     final creatorData = await _usersCollection.doc(currentUser.uid).get();
     final creatorName = (creatorData.data() as Map<String, dynamic>)['name'] ?? 'Unknown';
     
-    // Add mentor-only to description if not already there
+    // Add mentor-only to description if not already there and it's not a public community
     String finalDescription = description ?? '';
-    if (!finalDescription.contains('mentor-only')) {
+    if (!isPublic && !finalDescription.contains('mentor-only')) {
       finalDescription = finalDescription.isEmpty 
           ? 'mentor-only community' 
           : '$finalDescription (mentor-only)';
@@ -427,7 +430,8 @@ class ChatService {
       'lastMessageAt': FieldValue.serverTimestamp(),
       'lastMessage': 'Community created',
       'isGroup': true,
-      'mentorOnly': true, // Only mentors can send messages
+      'mentorOnly': !isPublic, // Only mentors can send messages in private communities
+      'isPublic': isPublic, // Whether students can join this community
     });
     
     // Add a welcome message
@@ -435,7 +439,9 @@ class ChatService {
       'communityId': communityRef.id,
       'senderId': currentUser.uid,
       'senderName': creatorName,
-      'text': 'Welcome to the new community! Only mentors can send messages here.',
+      'text': isPublic 
+          ? 'Welcome to the new community! Students can join this community.'
+          : 'Welcome to the new community! Only mentors can send messages here.',
       'timestamp': FieldValue.serverTimestamp(),
       'type': 'system',
     });

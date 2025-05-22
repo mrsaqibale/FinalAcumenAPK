@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:acumen/theme/app_theme.dart';
 
 class QuizScoreDisplay extends StatelessWidget {
   final double score;

@@ -129,4 +129,62 @@ class UserRepository {
       return null;
     }
   }
+  
+  // Delete a user
+  Future<bool> deleteUser(String userId) async {
+    try {
+      await _firestore.collection(_collection).doc(userId).delete();
+      return true;
+    } catch (e) {
+      print('Error deleting user: $e');
+      return false;
+    }
+  }
+  
+  // Check and update user's verified skills status
+  Future<bool> checkAndUpdateUserVerifiedSkills(String userId) async {
+    try {
+      // Check if the user has any verified skills
+      final skillsSnapshot = await _firestore
+          .collection(_collection)
+          .doc(userId)
+          .collection('skills')
+          .where('isVerified', isEqualTo: true)
+          .get();
+          
+      final hasVerifiedSkills = skillsSnapshot.docs.isNotEmpty;
+      
+      // Update the user document
+      await _firestore.collection(_collection).doc(userId).update({
+        'hasVerifiedSkills': hasVerifiedSkills,
+      });
+      
+      return hasVerifiedSkills;
+    } catch (e) {
+      print('Error checking verified skills: $e');
+      return false;
+    }
+  }
+  
+  // Get all users with their skills status
+  Future<List<UserModel>> getAllUsersWithSkillStatus() async {
+    try {
+      final querySnapshot = await _firestore.collection(_collection).get();
+      final users = querySnapshot.docs.map((doc) => 
+        UserModel.fromMap(doc.data(), doc.id)).toList();
+        
+      // For each user, check if they have verified skills
+      for (var user in users) {
+        await checkAndUpdateUserVerifiedSkills(user.id);
+      }
+      
+      // Get the updated users
+      final updatedSnapshot = await _firestore.collection(_collection).get();
+      return updatedSnapshot.docs.map((doc) => 
+        UserModel.fromMap(doc.data(), doc.id)).toList();
+    } catch (e) {
+      print('Error getting users with skill status: $e');
+      return [];
+    }
+  }
 } 

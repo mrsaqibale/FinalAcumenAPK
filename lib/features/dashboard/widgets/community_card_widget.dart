@@ -26,6 +26,7 @@ class CommunityCardWidget extends StatelessWidget {
     final lastMessageTime = community['lastMessageAt'] != null
         ? (community['lastMessageAt'] as Timestamp).toDate()
         : DateTime.now();
+    final isPublic = community['isPublic'] as bool? ?? false;
     
     return Card(
       elevation: 2,
@@ -51,11 +52,32 @@ class CommunityCardWidget extends StatelessWidget {
                 ),
               ),
             ),
-            title: Text(
-              community['name'] as String,
-              style: const TextStyle(
-                fontWeight: FontWeight.bold,
-              ),
+            title: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    community['name'] as String,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: isPublic ? Colors.green.shade100 : Colors.blue.shade100,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text(
+                    isPublic ? 'Public' : 'Private',
+                    style: TextStyle(
+                      fontSize: 10,
+                      color: isPublic ? Colors.green.shade800 : Colors.blue.shade800,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ],
             ),
             subtitle: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -132,6 +154,34 @@ class CommunityCardWidget extends StatelessWidget {
                 ),
               );
             },
+          ),
+          // Description if available
+          if (community['description'] != null && (community['description'] as String).isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Text(
+                community['description'] as String,
+                style: TextStyle(
+                  fontSize: 13,
+                  color: Colors.grey.shade700,
+                ),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          // Community type explanation
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+            child: Text(
+              isPublic 
+                  ? 'Students can join this community on their own.'
+                  : 'Only mentor can add students to this community.',
+              style: TextStyle(
+                fontSize: 12,
+                fontStyle: FontStyle.italic,
+                color: Colors.grey.shade600,
+              ),
+            ),
           ),
           // Show members preview
           Padding(

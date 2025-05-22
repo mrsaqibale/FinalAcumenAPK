@@ -1,4 +1,3 @@
-import 'package:acumen/features/chat/controllers/chat_input_controller.dart';
 import 'package:acumen/theme/app_theme.dart';
 import 'package:flutter/material.dart';
 import 'dart:io';

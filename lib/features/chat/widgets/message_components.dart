@@ -2,7 +2,6 @@ import 'package:acumen/theme/app_theme.dart';
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/services.dart';
-import 'dart:math' as math;
 
 /// WhatsApp-style message components for various types of content
 class MessageComponents {
@@ -238,8 +237,6 @@ class MessageComponents {
     double? downloadProgress,
   }) {
     final Color bgColor = isCurrentUser ? AppTheme.primaryColor : Colors.grey.shade200;
-    final Color textColor = isCurrentUser ? Colors.white : Colors.black87;
-    final Color iconColor = isCurrentUser ? Colors.white : AppTheme.primaryColor;
     
     final minutes = (duration.inSeconds / 60).floor();
     final seconds = duration.inSeconds % 60;

@@ -3,22 +3,14 @@ import 'dart:io';
 import 'package:acumen/features/auth/controllers/auth_controller.dart';
 import 'package:acumen/features/chat/controllers/chat_controller.dart';
 import 'package:acumen/features/chat/controllers/chat_detail_controller.dart';
-import 'package:acumen/features/chat/utils/chat_screen_utils.dart';
 import 'package:acumen/theme/app_theme.dart';
-import 'package:acumen/widgets/cached_profile_image.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:file_picker/file_picker.dart';
-import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/material.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:provider/provider.dart';
 import 'package:acumen/utils/app_snackbar.dart';
-import 'package:uuid/uuid.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:path_provider/path_provider.dart';
-import 'package:permission_handler/permission_handler.dart';
 import 'package:mime/mime.dart';
-import 'package:url_launcher/url_launcher.dart';
 import 'package:acumen/features/chat/widgets/chat_message_item.dart';
 
 // Update the ChatMessage model to support file information
@@ -221,13 +213,26 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          conversation.participantName,
-                          style: const TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white,
-                          ),
+                        Row(
+                          children: [
+                            Text(
+                              conversation.participantName,
+                              style: const TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white,
+                              ),
+                            ),
+                            if (conversation.participantHasVerifiedSkills)
+                              Padding(
+                                padding: const EdgeInsets.only(left: 4.0),
+                                child: Icon(
+                                  FontAwesomeIcons.solidCircleCheck,
+                                  color: Colors.blue[100],
+                                  size: 14,
+                                ),
+                              ),
+                          ],
                         ),
                         const SizedBox(height: 2),
                         controller.typingUsers.containsKey(conversation.participantId) && 

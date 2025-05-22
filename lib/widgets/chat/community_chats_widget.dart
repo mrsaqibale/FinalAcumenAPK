@@ -20,6 +20,7 @@ class _CommunityChatsWidgetState extends State<CommunityChatsWidget> with Single
   late TabController _tabController;
   bool _isLoading = false;
   List<ConversationModel> _availableCommunities = [];
+  Set<String> _joiningCommunities = {};
 
   @override
   void initState() {
@@ -298,9 +299,14 @@ class _CommunityChatsWidgetState extends State<CommunityChatsWidget> with Single
   }
 
   void _joinCommunity(String communityId) async {
+    setState(() {
+      _joiningCommunities.add(communityId);
+    });
+    
     final authController = Provider.of<AuthController>(context, listen: false);
     final chatController = Provider.of<ChatController>(context, listen: false);
     
+    try {
     final success = await chatController.joinCommunity(
       communityId: communityId,
       userId: authController.currentUser!.uid,
@@ -315,6 +321,20 @@ class _CommunityChatsWidgetState extends State<CommunityChatsWidget> with Single
       setState(() {
         _availableCommunities = [];
       });
+      }
+    } catch (e) {
+      if (mounted) {
+        AppSnackbar.showError(
+          context: context,
+          message: 'Failed to join community: $e',
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _joiningCommunities.remove(communityId);
+        });
+      }
     }
   }
 
@@ -533,6 +553,7 @@ class _CommunityChatsWidgetState extends State<CommunityChatsWidget> with Single
       itemCount: communities.length,
       itemBuilder: (context, index) {
         final community = communities[index];
+        final isJoining = _joiningCommunities.contains(community.id);
         
         return Card(
           margin: const EdgeInsets.symmetric(vertical: 4),
@@ -546,13 +567,25 @@ class _CommunityChatsWidgetState extends State<CommunityChatsWidget> with Single
             ),
             title: Text(community.name),
             subtitle: Text(community.description ?? 'No description'),
-            trailing: ElevatedButton(
+            trailing: SizedBox(
+              width: 80,
+              child: ElevatedButton(
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppTheme.primaryColor,
                 foregroundColor: Colors.white,
               ),
-              onPressed: () => _joinCommunity(community.id),
-              child: const Text('Join'),
+                onPressed: isJoining ? null : () => _joinCommunity(community.id),
+                child: isJoining 
+                  ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                      ),
+                    )
+                  : const Text('Join'),
+              ),
             ),
           ),
         );

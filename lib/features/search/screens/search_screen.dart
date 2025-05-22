@@ -5,6 +5,7 @@ import 'package:acumen/features/settings/controllers/settings_controller.dart';
 import 'package:flutter/material.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:provider/provider.dart';
+import 'package:acumen/features/chat/screens/chats_screen.dart';
 
 class SearchScreen extends StatelessWidget {
   const SearchScreen({super.key});
@@ -76,6 +77,35 @@ class _SearchScreenContentState extends State<_SearchScreenContent> {
       final tempController = SettingsController();
       await tempController.toggleNotifications(value);
     }
+  }
+
+  void _handleFeatureTap(Map<String, dynamic> item) {
+    final route = item['route'];
+    if (route == null) return;
+
+    // Handle special navigation for resources and communities
+    if (route == '/resources') {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => const ChatsScreen(initialTabIndex: 2), // Resources tab
+        ),
+      );
+      return;
+    }
+
+    if (route == '/communities') {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => const ChatsScreen(initialTabIndex: 1), // Community tab
+        ),
+      );
+      return;
+    }
+
+    // For all other routes, use normal navigation
+    Navigator.pushNamed(context, route);
   }
 
   @override
@@ -182,9 +212,7 @@ class _SearchScreenContentState extends State<_SearchScreenContent> {
                   if (!controller.hasSearchQuery) {
                     return InitialSuggestionsWidget(
                       featureItems: controller.getFeatureItems(),
-                      onFeatureTap: (item) {
-                        Navigator.pushNamed(context, item['route']);
-                      },
+                      onFeatureTap: _handleFeatureTap,
                     );
                   }
 

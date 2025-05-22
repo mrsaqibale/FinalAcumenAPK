@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import '../controllers/profile_controller.dart';
 import '../widgets/profile_skill_chip.dart';
 import '../widgets/profile_image_widget.dart';
+import '../models/skill_model.dart';
 
 class NewUserProfileScreen extends StatelessWidget {
   const NewUserProfileScreen({super.key});
@@ -86,13 +87,27 @@ class _NewUserProfileView extends StatelessWidget {
                           // Space for the bottom half of the profile image
                           const SizedBox(height: 60),
                           
-                          // User name
-                          Text(
+                          // User name with verification tick
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Text(
                                 userData['name'],
-                            style: const TextStyle(
-                              fontSize: 24,
-                              fontWeight: FontWeight.bold,
-                            ),
+                                style: const TextStyle(
+                                  fontSize: 24,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              if (userData['isVerified'] == true)
+                                Padding(
+                                  padding: const EdgeInsets.only(left: 8.0),
+                                  child: Icon(
+                                    FontAwesomeIcons.solidCircleCheck,
+                                    color: Colors.blue,
+                                    size: 18,
+                                  ),
+                                ),
+                            ],
                           ),
                           
                           // Email
@@ -141,16 +156,11 @@ class _NewUserProfileView extends StatelessWidget {
                           
                           const SizedBox(height: 15),
                           
-                          // Skills chips
+                          // Skills chips - handle both List<String> and List<SkillModel>
                           Wrap(
                             spacing: 10,
                             runSpacing: 10,
-                                children: (userData['skills'] as List<String>)
-                                    .map((skill) => ProfileSkillChip(
-                                          skill: skill,
-                                          isRemovable: false,
-                                        ))
-                                    .toList(),
+                                children: _buildSkillChips(userData['skills']),
                           ),
                         ],
                       ),
@@ -179,5 +189,32 @@ class _NewUserProfileView extends StatelessWidget {
         },
       ),
     );
+  }
+  
+  List<Widget> _buildSkillChips(dynamic skills) {
+    if (skills is List<SkillModel>) {
+      return skills.map((skill) => ProfileSkillChip(
+        skill: skill.name,
+        isRemovable: false,
+        isVerified: skill.isVerified,
+      )).toList();
+    } else if (skills is List) {
+      return skills.map((skill) {
+        if (skill is SkillModel) {
+          return ProfileSkillChip(
+            skill: skill.name,
+            isRemovable: false,
+            isVerified: skill.isVerified,
+          );
+        } else {
+          return ProfileSkillChip(
+            skill: skill.toString(),
+            isRemovable: false,
+            isVerified: false,
+          );
+        }
+      }).toList();
+    }
+    return [];
   }
 } 

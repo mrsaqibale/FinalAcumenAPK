@@ -32,7 +32,7 @@ class AppColors {
   static const Color iconLight = Colors.white;
 
   // Button Colors
-  static const Color buttonPrimary = Color(0xFF0D2444);  // Same as primary
+  static const Color buttonPrimary = Color(0xFF081A33);  // Same as primary
   static const Color buttonSecondary = Color(0xFF757575);
   static const Color buttonDisabled = Color(0xFFBDBDBD);
 } 

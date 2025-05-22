@@ -7,16 +7,18 @@ import '../screens/profile_image_viewer_screen.dart';
 
 class ProfileImageWidget extends StatelessWidget {
   final double topPosition;
-  final VoidCallback onCameraTap;
+  final VoidCallback? onCameraTap;
   final String? imageUrl;
   final File? imageFile;
+  final bool showCameraIcon;
 
   const ProfileImageWidget({
     super.key,
     required this.topPosition,
-    required this.onCameraTap,
+    this.onCameraTap,
     this.imageUrl,
     this.imageFile,
+    this.showCameraIcon = false,
   });
 
   void _handleImageTap(BuildContext context) {
@@ -38,7 +40,8 @@ class ProfileImageWidget extends StatelessWidget {
     return SizedBox(
       height: 150,
       child: Center(
-        child: Stack(
+        child: showCameraIcon && onCameraTap != null
+            ? Stack(
           clipBehavior: Clip.none,
           children: [
             CachedProfileImage(
@@ -67,6 +70,12 @@ class ProfileImageWidget extends StatelessWidget {
               ),
             ),
           ],
+              )
+            : CachedProfileImage(
+                imageUrl: imageUrl,
+                imageFile: imageFile,
+                size: 120,
+                onTap: () => _handleImageTap(context),
         ),
       ),
     );

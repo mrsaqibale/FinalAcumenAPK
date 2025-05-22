@@ -12,6 +12,7 @@ import 'package:provider/provider.dart';
 import 'package:acumen/features/auth/controllers/auth_controller.dart';
 import 'package:acumen/features/chat/controllers/chat_controller.dart';
 
+
 class ChatsScreen extends StatefulWidget {
   final int initialTabIndex;
   final UserModel? selectedMentor;
@@ -46,6 +47,11 @@ class _ChatsScreenState extends State<ChatsScreen> with SingleTickerProviderStat
         _createChatWithMentor(widget.selectedMentor!);
       });
     }
+
+    // Fetch available communities for joining
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      Provider.of<ChatController>(context, listen: false).fetchAvailableCommunities();
+    });
   }
 
   Future<void> _createChatWithMentor(UserModel mentor) async {
@@ -110,7 +116,7 @@ class _ChatsScreenState extends State<ChatsScreen> with SingleTickerProviderStat
             children: [
               TabBar(
                 controller: _tabController,
-                isScrollable: false,
+                isScrollable: true,
                 indicatorSize: TabBarIndicatorSize.tab,
                 indicator: BoxDecoration(
                   border: Border(
@@ -152,10 +158,10 @@ class _ChatsScreenState extends State<ChatsScreen> with SingleTickerProviderStat
               clipBehavior: Clip.antiAlias,
               child: TabBarView(
                 controller: _tabController,
-                children: const [
-                  SoloChatsWidget(),
-                  CommunityChatsWidget(),
-                  ResourcesTabWidget(),
+                children: [
+                  const SoloChatsWidget(),
+                  const CommunityChatsWidget(),
+                  const ResourcesTabWidget(),
                 ],
               ),
             ),

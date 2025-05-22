@@ -1,6 +1,7 @@
 import 'package:acumen/features/auth/controllers/auth_controller.dart';
 import 'package:acumen/features/chat/controllers/chat_controller.dart';
 import 'package:acumen/features/chat/controllers/message_controller.dart';
+import 'package:acumen/features/chat/services/chat_service.dart';
 import 'package:acumen/features/chat/widgets/community_chat_app_bar.dart';
 import 'package:acumen/features/chat/widgets/community_chat_input.dart';
 import 'package:acumen/features/chat/widgets/community_chat_message_list.dart';
@@ -110,7 +111,7 @@ class _CommunityChatScreenState extends State<CommunityChatScreen> {
       }
 
       // Start actual sending process
-      _sendMessage(
+      await _sendMessage(
         text: text,
         mediaFile: mediaFile,
         mediaType: mediaType,
@@ -125,11 +126,22 @@ class _CommunityChatScreenState extends State<CommunityChatScreen> {
 
     try {
       final chatController = Provider.of<ChatController>(context, listen: false);
+      String? fileUrl;
+      
+      // Upload media file if present
+      if (mediaFile != null) {
+        fileUrl = await ChatService.uploadMediaFile(
+          file: mediaFile,
+          path: 'communities/${widget.communityId}/media',
+        );
+      }
+
+      // Send the message with the uploaded file URL
       await chatController.sendCommunityMessage(
         communityId: widget.communityId,
         text: text ?? '',
-        mediaFile: mediaFile,
-        mediaType: mediaType,
+        fileUrl: fileUrl,
+        fileType: mediaType,
       );
       
       // Remove optimistic message after successful send

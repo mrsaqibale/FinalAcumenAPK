@@ -6,7 +6,6 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:acumen/features/dashboard/widgets/communities_tab_widget.dart';
-import 'package:acumen/features/dashboard/widgets/assignments_tab_widget.dart';
 import 'package:acumen/features/dashboard/widgets/students_tab_widget.dart';
 import 'package:acumen/features/dashboard/widgets/logout_dialog_widget.dart';
 import 'package:acumen/features/resources/widgets/resources_tab_widget.dart';

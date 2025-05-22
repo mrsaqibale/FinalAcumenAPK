@@ -12,6 +12,7 @@ import '../widgets/profile_image_widget.dart';
 import '../widgets/profile_edit_field.dart';
 import '../widgets/profile_skills_widget.dart';
 import 'package:acumen/utils/app_snackbar.dart';
+import '../models/skill_model.dart';
 
 class EditProfileScreen extends StatefulWidget {
   const EditProfileScreen({super.key});
@@ -34,7 +35,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   String? _errorMessage;
   String? _profileImageUrl;
   File? _selectedImageFile;
-  List<String> userSkills = [];
+  List<SkillModel> userSkills = [];
 
   @override
   void initState() {
@@ -62,7 +63,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       setState(() {
         _nameController.text = userData['name'];
         _bioController.text = userData['bio'];
-        userSkills = List<String>.from(userData['skills']);
+        userSkills = List<SkillModel>.from(userData['skills']);
         _profileImageUrl = imageUrl;
         _isLoading = false;
       });
@@ -165,19 +166,49 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     }
   }
 
-  void _handleAddSkill() {
-    final newSkill = _skillsController.text.trim();
-    if (newSkill.isNotEmpty && !userSkills.contains(newSkill)) {
+  Future<void> _handleAddSkill(String name, File? file, String? fileType) async {
+    try {
+      final newSkill = await _profileRepository.addSkill(
+        name: name,
+        file: file,
+        fileType: fileType,
+      );
+      
       setState(() {
         userSkills.add(newSkill);
       });
+      
+      if (mounted) {
+        AppSnackbar.showSuccess(
+          context: context,
+          message: 'Skill added successfully',
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        AppSnackbar.showError(
+          context: context,
+          message: 'Error adding skill: ${e.toString()}',
+        );
+      }
     }
   }
 
-  void _handleRemoveSkill(String skill) {
+  void _handleRemoveSkill(String skillId) async {
+    try {
+      await _profileRepository.removeSkill(skillId);
+      
     setState(() {
-      userSkills.remove(skill);
+        userSkills.removeWhere((skill) => skill.id == skillId);
     });
+    } catch (e) {
+      if (mounted) {
+        AppSnackbar.showError(
+          context: context,
+          message: 'Error removing skill: ${e.toString()}',
+        );
+      }
+    }
   }
 
   Future<void> _saveProfile() async {
@@ -350,6 +381,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                   onCameraTap: _handleCameraTap,
                   imageUrl: _profileImageUrl,
                   imageFile: _selectedImageFile,
+            showCameraIcon: true,
           ),
         ],
       ),

@@ -1,15 +1,18 @@
 import 'package:flutter/material.dart';
+import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 
 class ProfileSkillChip extends StatelessWidget {
   final String skill;
   final VoidCallback? onRemove;
   final bool isRemovable;
+  final bool isVerified;
 
   const ProfileSkillChip({
     super.key,
     required this.skill,
     this.onRemove,
     this.isRemovable = false,
+    this.isVerified = false,
   });
 
   @override
@@ -22,12 +25,26 @@ class ProfileSkillChip extends StatelessWidget {
             border: Border.all(color: Colors.grey.withAlpha(128)),
             borderRadius: BorderRadius.circular(30),
           ),
-          child: Text(
-            skill,
-            style: const TextStyle(
-              fontSize: 14,
-              color: Colors.black87,
-            ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (isVerified)
+                Padding(
+                  padding: const EdgeInsets.only(right: 6.0),
+                  child: Icon(
+                    FontAwesomeIcons.solidCircleCheck,
+                    color: Colors.blue,
+                    size: 14,
+                  ),
+                ),
+              Text(
+                skill,
+                style: const TextStyle(
+                  fontSize: 14,
+                  color: Colors.black87,
+                ),
+              ),
+            ],
           ),
         ),
         if (isRemovable && onRemove != null)

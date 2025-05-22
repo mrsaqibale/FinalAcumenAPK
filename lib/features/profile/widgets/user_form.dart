@@ -8,6 +8,7 @@ import 'package:file_picker/file_picker.dart';
 import '../controllers/user_controller.dart';
 import '../models/user_model.dart';
 import 'package:acumen/theme/app_theme.dart';
+import 'package:acumen/theme/app_colors.dart';
 import 'package:acumen/utils/app_snackbar.dart';
 import 'package:acumen/features/auth/utils/login_validation.dart';
 
@@ -63,9 +64,10 @@ class _UserFormState extends State<UserForm> {
       final result = await FilePicker.platform.pickFiles(
         type: FileType.custom,
         allowedExtensions: ['pdf', 'jpg', 'jpeg', 'png'],
+        allowMultiple: false,
       );
 
-      if (result != null) {
+      if (result != null && result.files.isNotEmpty) {
         setState(() {
           _selectedDocument = result.files.first;
         });
@@ -97,7 +99,17 @@ class _UserFormState extends State<UserForm> {
           .child(widget.role)
           .child('$userId.${_selectedDocument!.extension}');
       
-      await ref.putData(_selectedDocument!.bytes!);
+      // Handle both file path and bytes
+      if (_selectedDocument!.path != null) {
+        // If we have a file path, upload using the file
+        await ref.putFile(File(_selectedDocument!.path!));
+      } else if (_selectedDocument!.bytes != null) {
+        // If we have bytes, upload using the bytes
+        await ref.putData(_selectedDocument!.bytes!);
+      } else {
+        throw Exception('Document has neither path nor bytes');
+      }
+      
       return await ref.getDownloadURL();
     } catch (e) {
       _showSnackBar('Error uploading document: $e', isSuccess: false);
@@ -122,6 +134,12 @@ class _UserFormState extends State<UserForm> {
       return;
     }
 
+    // Additional validation for document
+    if (_selectedDocument != null && _selectedDocument!.path == null && _selectedDocument!.bytes == null) {
+      _showSnackBar('Invalid document selected', isSuccess: false);
+      return;
+    }
+
     setState(() {
       _isSubmitting = true;
     });
@@ -140,50 +158,86 @@ class _UserFormState extends State<UserForm> {
         String? photoUrl;
         String? documentUrl;
         
-        if (_selectedImage != null) {
-          photoUrl = await _uploadImage(userId);
-        }
-        
-        if (_selectedDocument != null) {
-          documentUrl = await _uploadDocument(userId);
-        }
-        
-        // Create user model based on role
-        final newUser = UserModel(
-          id: userId,
-          name: _nameController.text.trim(),
-          email: _emailController.text.trim(),
-          role: widget.role,
-          isActive: true,
-          title: widget.role == 'mentor' ? _titleController.text.trim() : null,
-          photoUrl: photoUrl,
-          status: widget.role == 'mentor' ? 'pending_approval' : 'active',
-          isApproved: widget.role == 'mentor' ? false : true,
-          // Additional fields based on role
-          employeeId: widget.role == 'mentor' ? _employeeIdController.text.trim() : null,
-          department: widget.role == 'mentor' ? _departmentController.text.trim() : null,
-          rollNo: widget.role == 'student' ? int.tryParse(_rollNoController.text.trim()) : null,
-          isFirstSemester: widget.role == 'student' ? _isFirstSemester : null,
-          document: documentUrl,
-        );
+        try {
+          if (_selectedImage != null) {
+            photoUrl = await _uploadImage(userId);
+          }
+          
+          if (_selectedDocument != null) {
+            documentUrl = await _uploadDocument(userId);
+            if (documentUrl == null) {
+              throw Exception('Failed to upload document');
+            }
+          }
 
-        // Add user to Firestore
-        final userController = Provider.of<UserController>(context, listen: false);
-        final result = await userController.addUser(newUser);
+          // Create user model based on role
+          final newUser = UserModel(
+            id: userId,
+            name: _nameController.text.trim(),
+            email: _emailController.text.trim(),
+            role: widget.role,
+            isActive: true,
+            title: widget.role == 'mentor' ? _titleController.text.trim() : null,
+            photoUrl: photoUrl,
+            status: widget.role == 'mentor' ? 'pending_approval' : 'active',
+            isApproved: widget.role == 'mentor' ? false : true,
+            employeeId: widget.role == 'mentor' ? _employeeIdController.text.trim() : null,
+            department: widget.role == 'mentor' ? _departmentController.text.trim() : null,
+            rollNo: widget.role == 'student' ? int.tryParse(_rollNoController.text.trim()) : null,
+            isFirstSemester: widget.role == 'student' ? _isFirstSemester : null,
+            document: documentUrl,
+          );
 
-        if (result) {
-          _showSnackBar('${widget.role.capitalize()} added successfully');
-          Navigator.pop(context);
-        } else {
-          _showSnackBar('Failed to add user', isSuccess: false);
+          // Add user to Firestore
+          final userController = Provider.of<UserController>(context, listen: false);
+          final result = await userController.addUser(newUser);
+
+          if (result) {
+            if (mounted) {
+              _showSnackBar('${widget.role.capitalize()} added successfully');
+              
+              // Show success dialog before navigating
+              await showDialog(
+                context: context,
+                barrierDismissible: false,
+                builder: (context) => AlertDialog(
+                  title: const Text('Success'),
+                  content: Text(
+                    widget.role == 'mentor' 
+                        ? 'Mentor has been added and is pending approval. You can approve them from the Mentors tab.'
+                        : '${widget.role.capitalize()} has been added successfully.'
+                  ),
+                  actions: [
+                    TextButton(
+                      onPressed: () {
+                        Navigator.pop(context); // Close dialog
+                        Navigator.pop(context); // Return to dashboard
+                      },
+                      child: const Text('OK'),
+                    ),
+                  ],
+                ),
+              );
+            }
+          } else {
+            throw Exception('Failed to add user to database');
+          }
+        } catch (e) {
+          // If anything fails after user creation, delete the user
+          await userCredential.user!.delete();
+          throw e;
         }
       }
     } catch (e) {
-      _showSnackBar('Error: ${e.toString()}', isSuccess: false);
+      if (mounted) {
+        _showSnackBar('Error: ${e.toString()}', isSuccess: false);
+      }
     } finally {
-      setState(() {
-        _isSubmitting = false;
-      });
+      if (mounted) {
+        setState(() {
+          _isSubmitting = false;
+        });
+      }
     }
   }
 
@@ -191,8 +245,12 @@ class _UserFormState extends State<UserForm> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('Add ${widget.role.capitalize()}'),
+        title: Text(
+          'Add ${widget.role.capitalize()}',
+          style: const TextStyle(color: AppColors.textLight),
+        ),
         backgroundColor: AppTheme.primaryColor,
+        iconTheme: const IconThemeData(color: AppColors.textLight),
       ),
       body: Padding(
         padding: const EdgeInsets.all(16.0),

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../models/user_model.dart';
 import '../repositories/user_repository.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 class UserController with ChangeNotifier {
   final UserRepository _repository = UserRepository();
@@ -10,6 +11,7 @@ class UserController with ChangeNotifier {
   List<UserModel> _students = [];
   List<UserModel> _teachers = [];
   List<UserModel> _pendingTeacherApplications = [];
+  List<UserModel> _approvedMentors = [];
   
   bool _isLoading = false;
   String? _error;
@@ -20,6 +22,7 @@ class UserController with ChangeNotifier {
   List<UserModel> get students => _students;
   List<UserModel> get teachers => _teachers;
   List<UserModel> get pendingTeacherApplications => _pendingTeacherApplications;
+  List<UserModel> get approvedMentors => _approvedMentors;
   bool get isLoading => _isLoading;
   String? get error => _error;
 
@@ -284,13 +287,43 @@ class UserController with ChangeNotifier {
     notifyListeners();
 
     try {
-      // Load all user types in parallel
-      await Future.wait([
-        loadUsersByRole('admin'),
-        loadUsersByRole('mentor'),
-        loadUsersByRole('student'),
-        loadPendingTeacherApplications(),
-      ]);
+      // Load all users with their verified skills status
+      final users = await _repository.getAllUsersWithSkillStatus();
+      
+      // Reset all user lists
+      _admins = [];
+      _mentors = [];
+      _students = [];
+      _teachers = [];
+      _pendingTeacherApplications = [];
+      _approvedMentors = [];
+      
+      // Categorize users
+      for (final user in users) {
+        switch (user.role.toLowerCase()) {
+          case 'admin':
+            _admins.add(user);
+            break;
+          case 'mentor':
+            _mentors.add(user);
+            if (user.status == 'pending_approval') {
+              _pendingTeacherApplications.add(user);
+            } else if (user.isApproved == true) {
+              _approvedMentors.add(user);
+            }
+            break;
+          case 'teacher':
+            _teachers.add(user);
+            if (user.status == 'pending_approval') {
+              _pendingTeacherApplications.add(user);
+            } else if (user.isApproved == true) {
+              _approvedMentors.add(user);
+            }
+            break;
+          default:
+            _students.add(user);
+        }
+      }
       
       _isLoading = false;
       notifyListeners();
@@ -298,6 +331,16 @@ class UserController with ChangeNotifier {
       _error = 'Failed to load users: $e';
       _isLoading = false;
       notifyListeners();
+    }
+  }
+  
+  // Check if a user has verified skills
+  Future<bool> checkUserVerifiedSkills(String userId) async {
+    try {
+      return await _repository.checkAndUpdateUserVerifiedSkills(userId);
+    } catch (e) {
+      print('Error checking verified skills: $e');
+      return false;
     }
   }
 
@@ -342,6 +385,25 @@ class UserController with ChangeNotifier {
       _error = 'Failed to get logged in user: $e';
       notifyListeners();
       return null;
+    }
+  }
+
+  Future<bool> deleteUser(String userId) async {
+    try {
+      // Delete user document from Firestore
+      await _repository.deleteUser(userId);
+      
+      // Update local lists
+      _admins.removeWhere((user) => user.id == userId);
+      _mentors.removeWhere((user) => user.id == userId);
+      _students.removeWhere((user) => user.id == userId);
+      _pendingTeacherApplications.removeWhere((user) => user.id == userId);
+      
+      notifyListeners();
+      return true;
+    } catch (e) {
+      debugPrint('Error deleting user: $e');
+      return false;
     }
   }
 } 

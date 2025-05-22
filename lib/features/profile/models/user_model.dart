@@ -16,6 +16,8 @@ class UserModel {
   final Map<String, dynamic>? education; // Education information
   final Map<String, dynamic>? quizStats; // Quiz statistics
   final List<Map<String, dynamic>>? recentQuizzes; // Recent quiz results
+  final bool? hasVerifiedSkills; // Whether user has any verified skills
+  final List<dynamic>? skills; // User skills
 
   UserModel({
     required this.id,
@@ -35,6 +37,8 @@ class UserModel {
     this.education,
     this.quizStats,
     this.recentQuizzes,
+    this.hasVerifiedSkills,
+    this.skills,
   });
 
   // Convert to map for Firebase
@@ -57,6 +61,8 @@ class UserModel {
       'education': education,
       'quizStats': quizStats,
       'recentQuizzes': recentQuizzes,
+      'hasVerifiedSkills': hasVerifiedSkills,
+      'skills': skills,
     };
   }
 
@@ -82,6 +88,8 @@ class UserModel {
       recentQuizzes: map['recentQuizzes'] != null 
           ? List<Map<String, dynamic>>.from(map['recentQuizzes'])
           : null,
+      hasVerifiedSkills: map['hasVerifiedSkills'] as bool?,
+      skills: map['skills'] as List<dynamic>?,
     );
   }
 } 

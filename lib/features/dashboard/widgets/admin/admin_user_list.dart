@@ -5,7 +5,7 @@ import 'package:acumen/features/profile/controllers/user_controller.dart';
 import 'package:provider/provider.dart';
 import 'package:acumen/widgets/cached_profile_image.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
-import 'package:acumen/features/business/screens/user_profile_screen.dart';
+import 'package:acumen/features/profile/screens/user_profile_screen.dart';
 
 class AdminUserList extends StatefulWidget {
   final List<UserModel> users;
@@ -72,7 +72,16 @@ class _AdminUserListState extends State<AdminUserList> {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => UserProfileScreen(userId: user.id),
+        builder: (context) => UserProfileScreen(
+          name: user.name,
+          email: user.email,
+          imageUrl: user.photoUrl ?? '',
+          bio: user.education?['bio'] ?? 'No bio available',
+          skills: user.skills ?? (user.education?['skills'] != null 
+              ? List<dynamic>.from(user.education!['skills'])
+              : []),
+          isVerified: user.hasVerifiedSkills ?? false,
+        ),
       ),
     );
   }
@@ -220,12 +229,28 @@ class _AdminUserListState extends State<AdminUserList> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
+                    Row(
+                      children: [
+                        Flexible(
+                          child: Text(
                       user.name,
                       style: const TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.bold,
                       ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        if (user.hasVerifiedSkills == true)
+                          Padding(
+                            padding: const EdgeInsets.only(left: 4.0),
+                            child: Icon(
+                              FontAwesomeIcons.solidCircleCheck,
+                              color: Colors.blue,
+                              size: 14,
+                            ),
+                          ),
+                      ],
                     ),
                     Text(
                       user.email,

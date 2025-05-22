@@ -2,14 +2,16 @@ import 'package:flutter/material.dart';
 import 'package:acumen/theme/app_theme.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:acumen/widgets/cached_profile_image.dart';
+import 'package:acumen/features/profile/models/skill_model.dart';
 import 'profile_image_viewer_screen.dart';
 
 class UserProfileScreen extends StatelessWidget {
   final String name;
   final String email;
   final String bio;
-  final List<String> skills;
+  final List<dynamic> skills; // Can be List<String> or List<SkillModel>
   final String imageUrl;
+  final bool isVerified;
 
   const UserProfileScreen({
     super.key,
@@ -18,7 +20,19 @@ class UserProfileScreen extends StatelessWidget {
     this.bio = 'Aspiring software developer with a passion for learning and creating innovative solutions',
     this.skills = const ['python', 'Java', 'SQL'],
     this.imageUrl = 'assets/images/profile-img.png',
+    this.isVerified = false,
   });
+
+  bool get _hasVerifiedSkills {
+    if (skills.isEmpty) return false;
+    
+    for (var skill in skills) {
+      if (skill is SkillModel && skill.isVerified) {
+        return true;
+      }
+    }
+    return false;
+  }
 
   void _handleImageTap(BuildContext context) {
     Navigator.push(
@@ -74,13 +88,27 @@ class UserProfileScreen extends StatelessWidget {
                 children: [
                   const SizedBox(height: 60), // Space for the overlapping image
                   
-                  // User name
-                  Text(
-                    name,
-                    style: const TextStyle(
-                      fontSize: 24,
-                      fontWeight: FontWeight.bold,
-                    ),
+                  // User name with verification icon if verified
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(
+                        name,
+                        style: const TextStyle(
+                          fontSize: 24,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      if (_hasVerifiedSkills || isVerified)
+                        Padding(
+                          padding: const EdgeInsets.only(left: 8.0),
+                          child: Icon(
+                            FontAwesomeIcons.solidCircleCheck,
+                            color: Colors.blue,
+                            size: 18,
+                          ),
+                        ),
+                    ],
                   ),
                   
                   // Email
@@ -148,7 +176,15 @@ class UserProfileScreen extends StatelessWidget {
                     Wrap(
                       spacing: 10,
                       runSpacing: 10,
-                      children: skills.map((skill) => _buildSkillChip(skill)).toList(),
+                      children: skills.map((skill) {
+                        // Handle both String and SkillModel types
+                        if (skill is String) {
+                          return _buildSkillChip(skill, false);
+                        } else if (skill is SkillModel) {
+                          return _buildSkillChip(skill.name, skill.isVerified);
+                        }
+                        return _buildSkillChip(skill.toString(), false);
+                      }).toList(),
                     ),
                 ],
               ),
@@ -159,19 +195,36 @@ class UserProfileScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildSkillChip(String skill) {
+  Widget _buildSkillChip(String skill, bool isVerified) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
       decoration: BoxDecoration(
         border: Border.all(color: Colors.grey.withAlpha(128)),
         borderRadius: BorderRadius.circular(30),
       ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (isVerified)
+            Padding(
+              padding: const EdgeInsets.only(right: 6.0),
+              child: Icon(
+                FontAwesomeIcons.solidCircleCheck,
+                color: Colors.blue,
+                size: 14,
+              ),
+            ),
+          Flexible(
       child: Text(
         skill,
+              overflow: TextOverflow.ellipsis,
         style: const TextStyle(
           fontSize: 14,
           color: Colors.black87,
         ),
+            ),
+          ),
+        ],
       ),
     );
   }

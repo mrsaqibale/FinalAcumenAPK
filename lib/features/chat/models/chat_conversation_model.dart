@@ -16,6 +16,7 @@ class ChatConversationAdapter extends TypeAdapter<ChatConversation> {
       lastMessageTime: reader.read(),
       hasUnreadMessages: reader.read(),
       isGroup: reader.read(),
+      participantHasVerifiedSkills: reader.read(),
     );
   }
 
@@ -29,6 +30,7 @@ class ChatConversationAdapter extends TypeAdapter<ChatConversation> {
     writer.write(obj.lastMessageTime);
     writer.write(obj.hasUnreadMessages);
     writer.write(obj.isGroup);
+    writer.write(obj.participantHasVerifiedSkills);
   }
 }
 
@@ -57,6 +59,9 @@ class ChatConversation {
   
   @HiveField(7)
   final bool isGroup;
+
+  @HiveField(8)
+  final bool participantHasVerifiedSkills;
   
   ChatConversation({
     required this.id,
@@ -67,6 +72,7 @@ class ChatConversation {
     required this.lastMessageTime,
     this.hasUnreadMessages = false,
     this.isGroup = false,
+    this.participantHasVerifiedSkills = false,
   });
   
   String get timeString {
@@ -93,6 +99,7 @@ class ChatConversation {
     DateTime? lastMessageTime,
     bool? hasUnreadMessages,
     bool? isGroup,
+    bool? participantHasVerifiedSkills,
   }) {
     return ChatConversation(
       id: id ?? this.id,
@@ -103,6 +110,7 @@ class ChatConversation {
       lastMessageTime: lastMessageTime ?? this.lastMessageTime,
       hasUnreadMessages: hasUnreadMessages ?? this.hasUnreadMessages,
       isGroup: isGroup ?? this.isGroup,
+      participantHasVerifiedSkills: participantHasVerifiedSkills ?? this.participantHasVerifiedSkills,
     );
   }
 } 

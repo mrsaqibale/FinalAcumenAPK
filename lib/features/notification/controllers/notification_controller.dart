@@ -150,6 +150,7 @@ class NotificationController extends ChangeNotifier {
           'endDate': event.endDate.millisecondsSinceEpoch,
           'venue': event.venue,
           'timeMessage': timeMessage,
+          'imageUrl': event.imageUrl,
         },
       );
       
