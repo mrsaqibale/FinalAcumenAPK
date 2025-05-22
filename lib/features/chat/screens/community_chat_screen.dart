@@ -36,6 +36,7 @@ class _CommunityChatScreenState extends State<CommunityChatScreen> {
   String? currentUserId;
   late MessageController _messageController;
   List<Map<String, dynamic>> _optimisticMessages = [];
+  bool _isFirstLoad = true;
 
   @override
   void initState() {
@@ -43,15 +44,9 @@ class _CommunityChatScreenState extends State<CommunityChatScreen> {
     currentUserId = FirebaseAuth.instance.currentUser?.uid;
     _messageController = MessageController();
     
-    // Scroll to bottom after messages load
+    // Schedule a post-frame callback to scroll to bottom after initial render
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (_scrollController.hasClients) {
-        _scrollController.animateTo(
-          _scrollController.position.maxScrollExtent,
-          duration: const Duration(milliseconds: 300),
-          curve: Curves.easeOut,
-        );
-      }
+      _scrollToBottom();
     });
   }
 
@@ -60,6 +55,16 @@ class _CommunityChatScreenState extends State<CommunityChatScreen> {
     _scrollController.dispose();
     _messageController.dispose();
     super.dispose();
+  }
+
+  void _scrollToBottom() {
+    if (_scrollController.hasClients) {
+      _scrollController.animateTo(
+        _scrollController.position.maxScrollExtent,
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeOut,
+      );
+    }
   }
 
   // Check if current user is a mentor
@@ -83,32 +88,36 @@ class _CommunityChatScreenState extends State<CommunityChatScreen> {
 
   Future<void> _sendMessage({String? text, File? mediaFile, String? mediaType, bool isOptimistic = false}) async {
     if (isOptimistic) {
-      // Add message to optimistic list
+      // Create a timestamp for the optimistic message
+      final now = DateTime.now();
+      final optimisticTimestamp = Timestamp.fromDate(now);
+      
+      // Add message to optimistic list with proper initial values
       final optimisticMessage = {
-        'id': 'temp_${DateTime.now().millisecondsSinceEpoch}',
+        'id': 'temp_${now.millisecondsSinceEpoch}',
         'communityId': widget.communityId,
         'senderId': currentUserId,
         'senderName': Provider.of<AuthController>(context, listen: false).appUser?.name ?? 'Unknown',
         'text': text ?? '',
-        'imageUrl': null, // Will be updated when media is uploaded
-        'contentType': mediaType ?? (text != null ? 'text' : null),
-        'timestamp': Timestamp.now(),
+        'imageUrl': null,
+        'fileUrl': null,
+        'contentType': mediaType ?? (text != null ? 'text' : 'document'),
+        'fileType': mediaType ?? 'document',
+        'timestamp': optimisticTimestamp,
+        'createdAt': optimisticTimestamp,
         'type': 'message',
         'isOptimistic': true,
+        'isUploading': true,
       };
       
       setState(() {
         _optimisticMessages.add(optimisticMessage);
       });
 
-      // Scroll to bottom
-      if (_scrollController.hasClients) {
-        _scrollController.animateTo(
-          _scrollController.position.maxScrollExtent,
-          duration: const Duration(milliseconds: 300),
-          curve: Curves.easeOut,
-        );
-      }
+      // Scroll to bottom after adding optimistic message
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _scrollToBottom();
+      });
 
       // Start actual sending process
       await _sendMessage(
@@ -130,10 +139,28 @@ class _CommunityChatScreenState extends State<CommunityChatScreen> {
       
       // Upload media file if present
       if (mediaFile != null) {
+        // Update optimistic message to show upload in progress
+        if (_optimisticMessages.isNotEmpty) {
+          setState(() {
+            final optimisticMessage = _optimisticMessages.first;
+            optimisticMessage['isUploading'] = true;
+          });
+        }
+
         fileUrl = await ChatService.uploadMediaFile(
           file: mediaFile,
           path: 'communities/${widget.communityId}/media',
         );
+
+        // Update optimistic message with file URL
+        if (_optimisticMessages.isNotEmpty) {
+          setState(() {
+            final optimisticMessage = _optimisticMessages.first;
+            optimisticMessage['fileUrl'] = fileUrl;
+            optimisticMessage['imageUrl'] = fileUrl;
+            optimisticMessage['isUploading'] = false;
+          });
+        }
       }
 
       // Send the message with the uploaded file URL
@@ -151,19 +178,17 @@ class _CommunityChatScreenState extends State<CommunityChatScreen> {
         });
       }
       
-      // Scroll to bottom after sending
-      if (_scrollController.hasClients) {
-        _scrollController.animateTo(
-          _scrollController.position.maxScrollExtent,
-          duration: const Duration(milliseconds: 300),
-          curve: Curves.easeOut,
-        );
-      }
+      // Scroll to bottom again after sending the real message
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _scrollToBottom();
+      });
     } catch (e) {
-      // Remove optimistic message on error
+      // Update optimistic message to show error
       if (_optimisticMessages.isNotEmpty) {
         setState(() {
-          _optimisticMessages.removeAt(0);
+          final optimisticMessage = _optimisticMessages.first;
+          optimisticMessage['error'] = e.toString();
+          optimisticMessage['isUploading'] = false;
         });
       }
       
@@ -211,15 +236,48 @@ class _CommunityChatScreenState extends State<CommunityChatScreen> {
                   final realMessages = snapshot.data ?? [];
                   final allMessages = [...realMessages, ..._optimisticMessages];
                   
-                  // Sort messages by timestamp
+                  // Sort messages by timestamp with null safety
                   allMessages.sort((a, b) {
-                    final aTime = (a['timestamp'] as Timestamp).millisecondsSinceEpoch;
-                    final bTime = (b['timestamp'] as Timestamp).millisecondsSinceEpoch;
+                    // Helper function to safely get timestamp
+                    DateTime getMessageTime(Map<String, dynamic> message) {
+                      try {
+                        if (message['timestamp'] != null) {
+                          if (message['timestamp'] is Timestamp) {
+                            return (message['timestamp'] as Timestamp).toDate();
+                          }
+                          if (message['timestamp'] is FieldValue) {
+                            return DateTime.now();
+                          }
+                        }
+                        if (message['createdAt'] != null && message['createdAt'] is Timestamp) {
+                          return (message['createdAt'] as Timestamp).toDate();
+                        }
+                        // For optimistic messages or messages without timestamp
+                        if (message['isOptimistic'] == true) {
+                          return DateTime.now();
+                        }
+                        return DateTime.now();
+                      } catch (e) {
+                        print("DEBUG: Error getting message time: $e");
+                        return DateTime.now();
+                      }
+                    }
+
+                    final aTime = getMessageTime(a);
+                    final bTime = getMessageTime(b);
                     return aTime.compareTo(bTime);
                   });
 
                   if (allMessages.isEmpty) {
                     return const Center(child: Text('No messages yet'));
+                  }
+
+                  // Scroll to bottom on first load or when new messages arrive
+                  if (_isFirstLoad || realMessages.length > 0) {
+                    _isFirstLoad = false;
+                    WidgetsBinding.instance.addPostFrameCallback((_) {
+                      _scrollToBottom();
+                    });
                   }
 
                   return CommunityChatMessageList(

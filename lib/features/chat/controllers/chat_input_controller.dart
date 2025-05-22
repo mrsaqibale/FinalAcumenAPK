@@ -203,7 +203,7 @@ class ChatInputController extends ChangeNotifier {
       _recordingDuration = 0;
       notifyListeners();
     }
-  }
+}
 
   void clearSelection() {
     _selectedFile = null;

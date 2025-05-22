@@ -215,13 +215,13 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                       children: [
                         Row(
                           children: [
-                            Text(
-                              conversation.participantName,
-                              style: const TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.white,
-                              ),
+                        Text(
+                          conversation.participantName,
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                          ),
                             ),
                             if (conversation.participantHasVerifiedSkills)
                               Padding(

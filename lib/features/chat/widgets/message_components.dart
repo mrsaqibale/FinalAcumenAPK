@@ -17,7 +17,6 @@ class MessageComponents {
     bool isDownloading = false,
     double? downloadProgress,
   }) {
-    final Color bgColor = isCurrentUser ? AppTheme.primaryColor : Colors.grey.shade200;
     final Color textColor = isCurrentUser ? Colors.white : Colors.black87;
     final Color iconColor = isCurrentUser ? Colors.white : AppTheme.primaryColor;
     

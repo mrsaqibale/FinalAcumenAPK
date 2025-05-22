@@ -167,6 +167,11 @@ class ChatService {
       throw Exception('ChatService not initialized');
     }
     
+    final currentUser = _auth.currentUser;
+    if (currentUser == null) {
+      throw Exception('User must be logged in to create a conversation');
+    }
+    
     // Check if participant is active and has verified skills
     bool participantHasVerifiedSkills = false;
     try {
@@ -213,14 +218,46 @@ class ChatService {
       participantHasVerifiedSkills: participantHasVerifiedSkills,
     );
     
-    // Create message box
-    final boxName = '$_messagesBoxName-$conversationId';
-    _messageBoxes[conversationId] = await Hive.openBox<ChatMessage>(boxName);
-    
-    // Save conversation
-    await saveConversation(conversation);
-    
-    return conversation;
+    try {
+      // Create conversation in Firebase
+      await _firestore.collection('conversations').doc(conversationId).set({
+        'id': conversationId,
+        'members': [currentUser.uid, participantId],
+        'participantId': participantId,
+        'participantName': participantName,
+        'participantImageUrl': participantImageUrl,
+        'lastMessage': '',
+        'lastMessageAt': FieldValue.serverTimestamp(),
+        'lastMessageSender': '',
+        'createdAt': FieldValue.serverTimestamp(),
+        'createdBy': currentUser.uid,
+        'isGroup': isGroup,
+        'hasUnreadMessages': false,
+        'participantHasVerifiedSkills': participantHasVerifiedSkills,
+      });
+      
+      // Create message box
+      final boxName = '$_messagesBoxName-$conversationId';
+      _messageBoxes[conversationId] = await Hive.openBox<ChatMessage>(boxName);
+      
+      // Save conversation locally
+      await saveConversation(conversation);
+      
+      print("DEBUG: Created new conversation with ID: $conversationId");
+      
+      return conversation;
+    } catch (e) {
+      if (kDebugMode) {
+        print('Error creating conversation in Firebase: $e');
+      }
+      
+      // Still try to save locally as fallback
+      final boxName = '$_messagesBoxName-$conversationId';
+      _messageBoxes[conversationId] = await Hive.openBox<ChatMessage>(boxName);
+      await saveConversation(conversation);
+      
+      return conversation;
+    }
   }
   
   // Send a message in a conversation
@@ -233,19 +270,69 @@ class ChatService {
       throw Exception('Conversation not found');
     }
     
+    final currentUser = _auth.currentUser;
+    if (currentUser == null) {
+      throw Exception('User must be logged in to send a message');
+    }
+    
+    final conversation = getConversation(conversationId);
+    if (conversation == null) {
+      throw Exception('Conversation not found in local storage');
+    }
+    
+    final messageId = const Uuid().v4();
+    
+    // Create message
     final message = ChatMessage(
-      id: const Uuid().v4(),
-      senderId: 'current_user', // Assume current user is sending
-      receiverId: getConversation(conversationId)?.participantId ?? '',
+      id: messageId,
+      senderId: currentUser.uid,
+      receiverId: conversation.participantId,
       text: text,
       timestamp: DateTime.now(),
       imageUrl: imageUrl,
     );
     
-    // Save the message
-    await saveMessage(conversationId, message);
-    
-    return message;
+    try {
+      // Save to Firebase Firestore for real-time syncing between devices
+      await _firestore
+          .collection('chats')
+          .doc(conversationId)
+          .collection('messages')
+          .doc(messageId)
+          .set({
+        'id': messageId,
+        'text': text,
+        'senderId': currentUser.uid,
+        'senderName': currentUser.displayName ?? 'Unknown',
+        'receiverId': conversation.participantId,
+        'timestamp': FieldValue.serverTimestamp(),
+        'isRead': false,
+        'type': 'text',
+        'imageUrl': imageUrl,
+      });
+      
+      // Update conversation in Firestore
+      await _firestore
+          .collection('conversations')
+          .doc(conversationId)
+          .update({
+        'lastMessage': text,
+        'lastMessageSender': currentUser.uid,
+        'lastMessageAt': FieldValue.serverTimestamp(),
+      });
+      
+      // Also save locally
+      await saveMessage(conversationId, message);
+      
+      return message;
+    } catch (e) {
+      if (kDebugMode) {
+        print('Error sending message to Firebase: $e');
+      }
+      // Still try to save locally as fallback
+      await saveMessage(conversationId, message);
+      return message;
+    }
   }
   
   // Clear all chat data
@@ -290,43 +377,122 @@ class ChatService {
   
   // Get real-time stream of messages for a conversation
   static Stream<List<ChatMessage>> getMessagesStream(String conversationId) {
-    if (!_messageBoxes.containsKey(conversationId)) {
-      // Return empty stream initially
-      return Stream.value([]);
-    }
-    
+    // Create a stream controller for combining Firebase and local data
     final StreamController<List<ChatMessage>> controller = StreamController<List<ChatMessage>>();
     
-    // Listen to box changes
-    _messageBoxes[conversationId]!.watch().listen((_) {
-      // When box changes, emit new list of sorted messages
+    // Set up Firebase listener
+    FirebaseFirestore.instance
+        .collection('chats')
+        .doc(conversationId)
+        .collection('messages')
+        .orderBy('timestamp', descending: false)
+        .snapshots()
+        .listen((snapshot) {
+      try {
+        // Convert Firestore documents to ChatMessage objects
+        final messages = snapshot.docs.map((doc) {
+          final data = doc.data();
+          
+          DateTime messageTime;
+          try {
+            messageTime = data['timestamp'] != null 
+              ? (data['timestamp'] as Timestamp).toDate()
+              : DateTime.now();
+          } catch (e) {
+            messageTime = DateTime.now();
+          }
+          
+          // Create message object
+          final message = ChatMessage(
+            id: doc.id,
+            senderId: data['senderId'] ?? '',
+            receiverId: data['receiverId'] ?? '',
+            text: data['text'] ?? '',
+            timestamp: messageTime,
+            isRead: data['isRead'] ?? false,
+            fileUrl: data['fileUrl'],
+            fileName: data['fileName'],
+            fileType: data['type'],
+          );
+          
+          // Save to local cache for offline access
+          if (_messageBoxes.containsKey(conversationId)) {
+            _messageBoxes[conversationId]!.put(message.id, message);
+          }
+          
+          return message;
+        }).toList();
+        
+        // Sort by timestamp (oldest first)
+        messages.sort((a, b) => a.timestamp.compareTo(b.timestamp));
+        
+        // Emit sorted messages
+        controller.add(messages);
+      } catch (e) {
+        if (kDebugMode) {
+          print('Error in message stream: $e');
+        }
+        
+        // If there's an error with Firebase, fall back to local cache
+        if (_messageBoxes.containsKey(conversationId)) {
+          final localMessages = _messageBoxes[conversationId]!.values.toList();
+          localMessages.sort((a, b) => a.timestamp.compareTo(b.timestamp));
+          controller.add(localMessages);
+        } else {
+          controller.add([]);
+        }
+      }
+    }, onError: (e) {
+      if (kDebugMode) {
+        print('Error in Firebase message stream: $e');
+      }
+      
+      // If there's an error with Firebase, fall back to local cache
+      if (_messageBoxes.containsKey(conversationId)) {
+        final localMessages = _messageBoxes[conversationId]!.values.toList();
+        localMessages.sort((a, b) => a.timestamp.compareTo(b.timestamp));
+        controller.add(localMessages);
+      } else {
+        controller.add([]);
+      }
+    });
+    
+    // Initial data - use local cache while waiting for Firebase
+    if (_messageBoxes.containsKey(conversationId)) {
       final messages = _messageBoxes[conversationId]!.values.toList();
       messages.sort((a, b) => a.timestamp.compareTo(b.timestamp));
       controller.add(messages);
-    });
-    
-    // Add initial data
-    final messages = _messageBoxes[conversationId]!.values.toList();
-    messages.sort((a, b) => a.timestamp.compareTo(b.timestamp));
-    controller.add(messages);
+    } else {
+      controller.add([]);
+    }
     
     return controller.stream;
   }
   
   // Get community messages stream
   static Stream<List<Map<String, dynamic>>> getCommunityMessagesStream(String communityId) {
-    return _communityMessagesCollection
-        .where('communityId', isEqualTo: communityId)
+    print("DEBUG: ChatService - Setting up Firestore listener for community: $communityId");
+    print("DEBUG: ChatService - Path: communities/$communityId/messages");
+    
+    return _firestore
+        .collection('communities')
+        .doc(communityId)
+        .collection('messages')
         .orderBy('timestamp', descending: false)
         .snapshots()
         .map((snapshot) {
-          return snapshot.docs.map((doc) {
+          print("DEBUG: ChatService - Received snapshot with ${snapshot.docs.length} documents");
+          
+          final messages = snapshot.docs.map((doc) {
             final data = doc.data() as Map<String, dynamic>;
             return {
               'id': doc.id,
               ...data,
             };
           }).toList();
+          
+          print("DEBUG: ChatService - Processed ${messages.length} messages");
+          return messages;
         });
   }
 
@@ -435,8 +601,11 @@ class ChatService {
     });
     
     // Add a welcome message
-    await _communityMessagesCollection.add({
-      'communityId': communityRef.id,
+    await _firestore
+        .collection('communities')
+        .doc(communityRef.id)
+        .collection('messages')
+        .add({
       'senderId': currentUser.uid,
       'senderName': creatorName,
       'text': isPublic 
@@ -492,12 +661,17 @@ class ChatService {
     // Get user data
     final userData = await _usersCollection.doc(currentUser.uid).get();
     final userName = (userData.data() as Map<String, dynamic>)['name'] ?? 'Unknown';
+    final hasVerifiedSkills = (userData.data() as Map<String, dynamic>)['hasVerifiedSkills'] ?? false;
     
-    // Add message
-    await _communityMessagesCollection.add({
-      'communityId': communityId,
+    // Add message to subcollection
+    await _firestore
+        .collection('communities')
+        .doc(communityId)
+        .collection('messages')
+        .add({
       'senderId': currentUser.uid,
       'senderName': userName,
+      'senderHasVerifiedSkills': hasVerifiedSkills,
       'text': text,
       'imageUrl': imageUrl,
       'contentType': contentType ?? (imageUrl != null ? 'image' : 'text'),

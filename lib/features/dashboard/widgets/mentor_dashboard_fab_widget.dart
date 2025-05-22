@@ -3,7 +3,6 @@ import 'package:flutter/foundation.dart';
 import 'package:provider/provider.dart';
 import 'package:acumen/theme/app_theme.dart';
 import 'package:acumen/widgets/chat/new_community_dialog_widget.dart';
-import 'package:acumen/features/dashboard/widgets/create_assignment_dialog_widget.dart';
 import 'package:acumen/features/resources/screens/add_resource_screen.dart';
 import 'package:acumen/features/business/screens/add_quiz_screen.dart';
 import 'package:acumen/features/business/controllers/quiz_controller.dart';

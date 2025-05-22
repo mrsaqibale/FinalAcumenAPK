@@ -5,6 +5,7 @@ import 'package:acumen/features/chat/controllers/chat_controller.dart';
 import 'package:acumen/utils/app_snackbar.dart';
 import 'package:acumen/features/dashboard/widgets/community_card_widget.dart';
 import 'package:acumen/features/dashboard/widgets/members_dialog_widget.dart';
+import 'package:acumen/features/chat/screens/community_chat_screen.dart';
 
 class CommunitiesTabWidget extends StatelessWidget {
   const CommunitiesTabWidget({Key? key}) : super(key: key);
@@ -122,6 +123,20 @@ class CommunitiesTabWidget extends StatelessWidget {
       },
     );
   
+  }
+
+  void _navigateToCommunityChat(BuildContext context, Map<String, dynamic> community) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => CommunityChatScreen(
+          communityId: community['id'] as String,
+          communityName: community['name'] as String,
+          memberIds: List<String>.from(community['memberIds'] ?? []),
+          imageUrl: community['imageUrl'] as String?,
+        ),
+      ),
+    );
   }
 
   void _showDeleteCommunityConfirmation(BuildContext context, String communityId) {

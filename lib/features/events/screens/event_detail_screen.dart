@@ -1,4 +1,3 @@
-import 'package:acumen/features/events/models/event_model.dart';
 import 'package:acumen/theme/app_theme.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';

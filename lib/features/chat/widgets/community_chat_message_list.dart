@@ -368,16 +368,137 @@ class _CommunityChatMessageListState extends State<CommunityChatMessageList> {
   Widget _buildMessageContent(Map<String, dynamic> message, bool isCurrentUser) {
     final String text = message['text'] as String? ?? '';
     final String? imageUrl = message['imageUrl'] as String?;
+    final String? fileUrl = message['fileUrl'] as String?;
     final String contentType = message['contentType'] as String? ?? 'text';
+    final String? fileType = message['fileType'] as String?;
     final String messageId = message['id'] as String;
-    final timestamp = message['timestamp'] != null
-        ? (message['timestamp'] as Timestamp).toDate()
-        : DateTime.now();
+    final bool isOptimistic = message['isOptimistic'] == true;
+    final bool isUploading = message['isUploading'] == true;
+    final String? error = message['error'] as String?;
+    
+    // Handle timestamp with fallbacks
+    DateTime timestamp;
+    try {
+      if (message['timestamp'] != null) {
+        if (message['timestamp'] is Timestamp) {
+          timestamp = (message['timestamp'] as Timestamp).toDate();
+        } else if (message['timestamp'] is FieldValue) {
+          // If it's a server timestamp that hasn't been resolved yet
+          timestamp = DateTime.now();
+        } else {
+          timestamp = DateTime.now();
+        }
+      } else if (message['createdAt'] != null) {
+        // Try backup timestamp field
+        if (message['createdAt'] is Timestamp) {
+          timestamp = (message['createdAt'] as Timestamp).toDate();
+        } else {
+          timestamp = DateTime.now();
+        }
+      } else {
+        timestamp = DateTime.now();
+      }
+    } catch (e) {
+      print("DEBUG: Error parsing timestamp for message $messageId: $e");
+      timestamp = DateTime.now();
+    }
+    
+    // Use fileUrl as a fallback if imageUrl is null
+    final String? effectiveImageUrl = imageUrl ?? fileUrl;
+    final String effectiveContentType = contentType ?? fileType ?? 'text';
     
     // If message has a reply reference
     final bool isReply = message['type'] == 'reply';
     final bool isForwarded = message['type'] == 'forwarded';
     
+    // Show error state if there's an error
+    if (error != null) {
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        decoration: BoxDecoration(
+          color: Colors.red.shade100,
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Failed to send message',
+              style: TextStyle(color: Colors.red.shade900),
+            ),
+            if (text.isNotEmpty) Text(text),
+            Text(
+              DateFormat('h:mm a').format(timestamp),
+              style: TextStyle(
+                fontSize: 10,
+                color: Colors.red.shade900.withOpacity(0.7),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+    
+    // Show uploading state
+    if (isOptimistic && isUploading) {
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        decoration: BoxDecoration(
+          color: isCurrentUser
+              ? AppTheme.primaryColor.withOpacity(0.7)
+              : Colors.grey.shade200,
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (text.isNotEmpty) Text(
+              text,
+              style: TextStyle(
+                color: isCurrentUser ? Colors.white : Colors.black87,
+                fontSize: 15,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    valueColor: AlwaysStoppedAnimation<Color>(
+                      isCurrentUser ? Colors.white : Colors.grey.shade700,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  'Uploading...',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: isCurrentUser ? Colors.white70 : Colors.grey.shade700,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 4),
+            Text(
+              DateFormat('h:mm a').format(timestamp),
+              style: TextStyle(
+                fontSize: 10,
+                color: isCurrentUser
+                    ? Colors.white.withOpacity(0.7)
+                    : Colors.black54,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+    
+    // Regular message content
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
       decoration: BoxDecoration(
@@ -451,7 +572,7 @@ class _CommunityChatMessageListState extends State<CommunityChatMessageList> {
           ],
           
           // Regular text message
-          if (text.isNotEmpty && contentType != 'voice')
+          if (text.isNotEmpty && effectiveContentType != 'voice')
             Text(
               text,
               style: TextStyle(
@@ -461,7 +582,7 @@ class _CommunityChatMessageListState extends State<CommunityChatMessageList> {
             ),
           
           // Voice message
-          if (contentType == 'voice') ...[
+          if (effectiveContentType == 'voice') ...[
             Consumer<MessageController>(
               builder: (context, controller, child) {
                 final isDownloaded = controller.isDownloaded(messageId);
@@ -474,12 +595,12 @@ class _CommunityChatMessageListState extends State<CommunityChatMessageList> {
                 
                 return MessageComponents.voiceMessageWidget(
                   context: context,
-                  url: imageUrl ?? '',
+                  url: effectiveImageUrl ?? '',
                   isCurrentUser: isCurrentUser,
                   isPlaying: isPlaying,
                   playbackProgress: playbackProgress,
                   duration: const Duration(seconds: 30), // Placeholder, should come from message
-                  onPlayPause: () => _handleMediaTap(messageId, imageUrl ?? '', contentType),
+                  onPlayPause: () => _handleMediaTap(messageId, effectiveImageUrl ?? '', effectiveContentType),
                   isDownloaded: isDownloaded,
                   isDownloading: isDownloading,
                   downloadProgress: downloadProgress,
@@ -489,7 +610,7 @@ class _CommunityChatMessageListState extends State<CommunityChatMessageList> {
           ]
           
           // Images, videos, documents
-          else if (imageUrl != null && contentType != 'voice') ...[
+          else if (effectiveImageUrl != null && effectiveContentType != 'voice') ...[
             if (text.isNotEmpty) 
               const SizedBox(height: 8),
             
@@ -501,10 +622,10 @@ class _CommunityChatMessageListState extends State<CommunityChatMessageList> {
                 
                 return MessageComponents.mediaDownloadWidget(
                   context: context,
-                  url: imageUrl,
-                  contentType: contentType,
+                  url: effectiveImageUrl,
+                  contentType: effectiveContentType,
                   isCurrentUser: isCurrentUser,
-                  onTap: () => _handleMediaTap(messageId, imageUrl, contentType),
+                  onTap: () => _handleMediaTap(messageId, effectiveImageUrl, effectiveContentType),
                   fileName: message['fileName'] as String?,
                   isDownloaded: isDownloaded,
                   isDownloading: isDownloading,
@@ -530,10 +651,20 @@ class _CommunityChatMessageListState extends State<CommunityChatMessageList> {
   }
 
   @override
-Widget build(BuildContext context) {
+  Widget build(BuildContext context) {
     // Use provided messages if available, otherwise use stream
     if (widget.messages != null) {
-      _messages = widget.messages!;
+      _messages = widget.messages!.map((message) {
+        // Ensure each message has a valid timestamp
+        if (message['timestamp'] == null && message['createdAt'] == null) {
+          return {
+            ...message,
+            'timestamp': Timestamp.now(),
+          };
+        }
+        return message;
+      }).toList();
+      
       return _buildMessageList();
     }
 
@@ -550,7 +681,16 @@ Widget build(BuildContext context) {
               return Center(child: Text('Error: ${snapshot.error}'));
             }
 
-            _messages = snapshot.data ?? [];
+            // Ensure all messages have valid timestamps
+            _messages = (snapshot.data ?? []).map((message) {
+              if (message['timestamp'] == null && message['createdAt'] == null) {
+                return {
+                  ...message,
+                  'timestamp': Timestamp.now(),
+                };
+              }
+              return message;
+            }).toList();
             
             // Scroll to bottom when messages update
             if (_messages.isNotEmpty) {
@@ -677,12 +817,12 @@ Widget build(BuildContext context) {
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
                                   Text(
-                                    message['senderName'] as String? ?? 'Unknown',
-                                    style: TextStyle(
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.bold,
-                                      color: Colors.grey.shade700,
-                                    ),
+                                message['senderName'] as String? ?? 'Unknown',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.grey.shade700,
+                                ),
                                   ),
                                   if (message['senderHasVerifiedSkills'] == true)
                                     Padding(

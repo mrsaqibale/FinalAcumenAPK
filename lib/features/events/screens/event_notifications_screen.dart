@@ -6,7 +6,6 @@ import 'package:acumen/features/notification/controllers/notification_controller
 import 'package:acumen/theme/app_theme.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:intl/intl.dart';
 import 'package:flutter/foundation.dart';
 
 class EventNotificationsScreen extends StatefulWidget {

@@ -30,11 +30,11 @@ class ChatCardWidget extends StatelessWidget {
           children: [
             Expanded(
               child: Text(
-                conversation.participantName,
-                style: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                ),
+          conversation.participantName,
+          style: const TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.bold,
+          ),
               ),
             ),
             if (conversation.participantHasVerifiedSkills)

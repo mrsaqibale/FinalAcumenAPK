@@ -10,12 +10,7 @@ class PrivacySettingsScreen extends StatefulWidget {
 }
 
 class _PrivacySettingsScreenState extends State<PrivacySettingsScreen> {
-  bool _profileVisibility = true;
-  bool _showOnlineStatus = true;
-  bool _allowMessages = true;
-  bool _allowTagging = true;
-  bool _dataCollection = true;
-  bool _locationTracking = false;
+ 
 
   @override
   Widget build(BuildContext context) {

@@ -84,7 +84,84 @@ class ChatController extends ChangeNotifier {
   
   // Load all conversations
   Future<void> _loadConversations() async {
-    _conversations = ChatService.getConversations();
+    try {
+      final currentUser = FirebaseAuth.instance.currentUser;
+      if (currentUser == null) {
+        _conversations = [];
+        notifyListeners();
+        return;
+      }
+      
+      // Fetch conversations from Firebase
+      final firestoreConversations = await _firestore
+          .collection('conversations')
+          .where('members', arrayContains: currentUser.uid)
+          .orderBy('lastMessageAt', descending: true)
+          .get();
+      
+      // Convert to ChatConversation objects
+      List<ChatConversation> fetchedConversations = [];
+      for (var doc in firestoreConversations.docs) {
+        final data = doc.data();
+        
+        // Determine participant (the other user in the conversation)
+        String participantId = '';
+        List<String> members = List<String>.from(data['members'] ?? []);
+        for (var memberId in members) {
+          if (memberId != currentUser.uid) {
+            participantId = memberId;
+            break;
+          }
+        }
+        
+        // Skip if no participant found (should not happen)
+        if (participantId.isEmpty && !data['isGroup']) continue;
+        
+        // For group chats, use the first member other than current user
+        if (data['isGroup'] && participantId.isEmpty && members.isNotEmpty) {
+          participantId = members.first;
+        }
+        
+        // Convert timestamp to DateTime
+        DateTime lastMessageTime = DateTime.now();
+        if (data['lastMessageAt'] != null) {
+          try {
+            lastMessageTime = (data['lastMessageAt'] as Timestamp).toDate();
+          } catch (e) {
+            // Use current time as fallback
+          }
+        }
+        
+        // Create ChatConversation object
+        fetchedConversations.add(ChatConversation(
+          id: doc.id,
+          participantId: data['participantId'] ?? participantId,
+          participantName: data['participantName'] ?? 'Unknown',
+          participantImageUrl: data['participantImageUrl'],
+          lastMessage: data['lastMessage'] ?? '',
+          lastMessageTime: lastMessageTime,
+          hasUnreadMessages: data['hasUnreadMessages'] ?? false,
+          isGroup: data['isGroup'] ?? false,
+          participantHasVerifiedSkills: data['participantHasVerifiedSkills'] ?? false,
+        ));
+      }
+      
+      // Save to local Hive cache
+      for (var conversation in fetchedConversations) {
+        await ChatService.saveConversation(conversation);
+      }
+      
+      // Update the conversations list
+      _conversations = fetchedConversations;
+    } catch (e) {
+      if (kDebugMode) {
+        print('Error loading conversations from Firebase: $e');
+      }
+      
+      // Fall back to local cache if Firebase fails
+      _conversations = ChatService.getConversations();
+    }
+    
     notifyListeners();
   }
   
@@ -448,6 +525,10 @@ class ChatController extends ChangeNotifier {
     String? forwardedFromName,
   }) async {
     try {
+      print("DEBUG: Sending community message to community ID: $communityId");
+      print("DEBUG: Message text: $text");
+      print("DEBUG: File URL: $fileUrl, File Type: $fileType");
+      
       final currentUser = FirebaseAuth.instance.currentUser;
       if (currentUser == null) {
         throw Exception('User not authenticated');
@@ -458,22 +539,31 @@ class ChatController extends ChangeNotifier {
       final userData = userDoc.data() as Map<String, dynamic>;
       final hasVerifiedSkills = userData['hasVerifiedSkills'] ?? false;
       
-      // Create message document
+      // Create a server timestamp
+      final serverTimestamp = FieldValue.serverTimestamp();
+      
+      // Create message document with explicit timestamp
       final messageData = {
         'id': const Uuid().v4(),
         'text': text,
         'senderId': currentUser.uid,
         'senderName': userData['name'] ?? 'Unknown',
         'senderHasVerifiedSkills': hasVerifiedSkills,
-        'timestamp': FieldValue.serverTimestamp(),
+        'timestamp': serverTimestamp,
+        'createdAt': serverTimestamp, // Add a backup timestamp field
         'type': 'message',
         'fileUrl': fileUrl,
+        'imageUrl': fileUrl, // Set imageUrl to be the same as fileUrl for backward compatibility
         'fileType': fileType,
+        'contentType': fileType, // Set contentType to be the same as fileType for UI rendering
         'replyToMessageId': replyToMessageId,
         'replyToSenderName': replyToSenderName,
         'replyToText': replyToText,
         'forwardedFromName': forwardedFromName,
       };
+      
+      print("DEBUG: Adding message to Firestore path: communities/$communityId/messages");
+      print("DEBUG: Message data: $messageData");
       
       // Add message to community
       await _communitiesCollection
@@ -481,13 +571,19 @@ class ChatController extends ChangeNotifier {
           .collection('messages')
           .add(messageData);
       
-      // Update community's last message
+      print("DEBUG: Message added successfully");
+      
+      // Update community's last message with explicit timestamp
       await _communitiesCollection.doc(communityId).update({
         'lastMessage': text,
         'lastMessageSender': userData['name'] ?? 'Unknown',
-        'lastMessageAt': FieldValue.serverTimestamp(),
+        'lastMessageAt': serverTimestamp,
+        'updatedAt': serverTimestamp, // Add a backup timestamp field
       });
+      
+      print("DEBUG: Community last message updated");
     } catch (e) {
+      print("DEBUG: Error sending community message: $e");
       if (kDebugMode) {
         print('Error sending community message: $e');
       }
@@ -497,7 +593,15 @@ class ChatController extends ChangeNotifier {
   
   // Get community messages stream
   Stream<List<Map<String, dynamic>>> getCommunityMessagesStream(String communityId) {
-    return ChatService.getCommunityMessagesStream(communityId);
+    print("DEBUG: Getting messages stream for community ID: $communityId");
+    
+    return ChatService.getCommunityMessagesStream(communityId).map((messages) {
+      print("DEBUG: Received ${messages.length} messages from stream");
+      if (messages.isNotEmpty) {
+        print("DEBUG: Latest message: ${messages.last['text']}");
+      }
+      return messages;
+    });
   }
   
   // Get communities the current user is a member of
