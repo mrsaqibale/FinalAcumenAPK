@@ -1,0 +1,5 @@
+# Add your debug token here
+# You can get this from Firebase Console > App Check > Debug tokens
+# Example: 1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef 
+
+3D48DDF4-03C2-4611-89A2-D5E31653917F 

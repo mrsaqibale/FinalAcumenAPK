@@ -10,10 +10,18 @@ class ChatScreenUtils {
     String conversationId,
     ScrollController scrollController,
   ) async {
+    print('[DEBUG] Loading messages for conversation: ' + conversationId);
     try {
-      final chatController = Provider.of<ChatController>(context, listen: false);
+      final chatController = Provider.of<ChatController>(
+        context,
+        listen: false,
+      );
       final messages = await chatController.getMessages(conversationId);
-      
+      print(
+        '[DEBUG] Loaded \\${messages.length} messages for conversation: ' +
+            conversationId,
+      );
+
       // Scroll to bottom after messages load
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (scrollController.hasClients) {
@@ -24,9 +32,10 @@ class ChatScreenUtils {
           );
         }
       });
-      
+
       return messages;
     } catch (e) {
+      print('[DEBUG] Error loading messages: ' + e.toString());
       AppSnackbar.showError(
         context: context,
         message: 'Error loading messages: $e',
@@ -42,17 +51,37 @@ class ChatScreenUtils {
     TextEditingController messageController,
     ScrollController scrollController,
   ) async {
-    if (text.trim().isEmpty) return;
+    print(
+      '[DEBUG] Attempting to send message: ' + text + ' to ' + conversationId,
+    );
+    if (text.trim().isEmpty) {
+      print('[DEBUG] Message is empty, aborting send.');
+      return;
+    }
 
     messageController.clear();
 
     try {
-      final chatController = Provider.of<ChatController>(context, listen: false);
+      final chatController = Provider.of<ChatController>(
+        context,
+        listen: false,
+      );
+      final conversation = chatController.getConversation(conversationId);
+      if (conversation == null) {
+        print('[DEBUG] Conversation not found for id: ' + conversationId);
+        AppSnackbar.showError(
+          context: context,
+          message: 'Conversation not found',
+        );
+        return;
+      }
       await chatController.sendMessage(
         conversationId: conversationId,
         text: text,
+        receiverId: conversation.participantId,
       );
-      
+      print('[DEBUG] Message sent successfully to ' + conversationId);
+
       // Scroll to bottom after sending
       if (scrollController.hasClients) {
         scrollController.animateTo(
@@ -62,6 +91,7 @@ class ChatScreenUtils {
         );
       }
     } catch (e) {
+      print('[DEBUG] Error sending message: ' + e.toString());
       AppSnackbar.showError(
         context: context,
         message: 'Error sending message: $e',
@@ -78,4 +108,4 @@ class ChatScreenUtils {
       );
     }
   }
-} 
+}

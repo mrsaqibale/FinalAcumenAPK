@@ -11,14 +11,12 @@ import 'package:acumen/features/dashboard/widgets/dashboard_header.dart';
 import 'package:acumen/features/dashboard/widgets/dashboard_menu_items.dart';
 import 'package:acumen/features/events/controllers/event_controller.dart';
 import 'package:provider/provider.dart';
+import 'package:acumen/features/notification/screens/notifications_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
   final String username;
 
-  const DashboardScreen({
-    super.key,
-    this.username = 'User name',
-  });
+  const DashboardScreen({super.key, this.username = 'User name'});
 
   @override
   State<DashboardScreen> createState() => _DashboardScreenState();
@@ -31,7 +29,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   @override
   void initState() {
     super.initState();
-    
+
     // Check for expired events when dashboard loads
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
@@ -42,7 +40,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   Future<void> _checkExpiredEvents() async {
     try {
-      final eventController = Provider.of<EventController>(context, listen: false);
+      final eventController = Provider.of<EventController>(
+        context,
+        listen: false,
+      );
       await eventController.loadEvents();
       await eventController.checkForExpiredEvents(context);
     } catch (e) {
@@ -52,54 +53,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      key: _scaffoldKey,
-      backgroundColor: AppColors.primary,
-      appBar: AppBar(
-        backgroundColor: AppColors.primary,
-        elevation: 0,
-        title: const Text(
-          'Home',
-          style: TextStyle(
-            color: AppColors.textLight,
-            fontWeight: FontWeight.bold,
-            fontSize: 22,
-          ),
-        ),
-        leading: IconButton(
-          icon: const Icon(FontAwesomeIcons.bars, color: AppColors.iconLight, size: 22),
-          onPressed: () {
-            _scaffoldKey.currentState?.openDrawer();
-          },
-        ),
-        actions: [
-          IconButton(
-            icon: const Icon(FontAwesomeIcons.magnifyingGlass, color: AppColors.iconLight, size: 22),
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const SearchScreen(),
-                ),
-              );
-            },
-          ),
-          IconButton(
-            icon: Image.asset('assets/images/icons/user.png', color: AppColors.iconLight, height: 25, width: 25),
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const NewUserProfileScreen(),
-                ),
-              );
-            },
-          ),
-          const SizedBox(width: 8),
-        ],
-      ),
-      drawer: DashboardDrawer(username: widget.username),
-      body: Column(
+    Widget bodyContent;
+    if (_selectedIndex == 0) {
+      bodyContent = Column(
         children: [
           DashboardHeader(username: widget.username),
           Expanded(
@@ -121,42 +77,108 @@ class _DashboardScreenState extends State<DashboardScreen> {
             ),
           ),
         ],
+      );
+    } else {
+      bodyContent = const NotificationsScreen();
+    }
+
+    return Scaffold(
+      key: _scaffoldKey,
+      backgroundColor: AppColors.primary,
+      appBar: AppBar(
+        backgroundColor: AppColors.primary,
+        elevation: 0,
+        title: const Text(
+          'Home',
+          style: TextStyle(
+            color: AppColors.textLight,
+            fontWeight: FontWeight.bold,
+            fontSize: 22,
+          ),
+        ),
+        leading: IconButton(
+          icon: const Icon(
+            FontAwesomeIcons.bars,
+            color: AppColors.iconLight,
+            size: 22,
+          ),
+          onPressed: () {
+            _scaffoldKey.currentState?.openDrawer();
+          },
+        ),
+        actions: [
+          IconButton(
+            icon: const Icon(
+              FontAwesomeIcons.magnifyingGlass,
+              color: AppColors.iconLight,
+              size: 22,
+            ),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const SearchScreen()),
+              );
+            },
+          ),
+          IconButton(
+            icon: Image.asset(
+              'assets/images/icons/user.png',
+              color: AppColors.iconLight,
+              height: 25,
+              width: 25,
+            ),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const NewUserProfileScreen(),
+                ),
+              );
+            },
+          ),
+          const SizedBox(width: 8),
+        ],
       ),
-      bottomNavigationBar: DashboardBottomNav(
-        selectedIndex: _selectedIndex,
+      drawer: DashboardDrawer(username: widget.username),
+      body: bodyContent,
+      bottomNavigationBar: BottomNavigationBar(
+        currentIndex: _selectedIndex,
         onTap: (index) {
           setState(() {
             _selectedIndex = index;
           });
-
-          // Handle navigation based on bottom nav selection
-          if (index == 1) {
-            // Navigate to Mentors screen
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => const MentorsScreen(),
-              ),
-            );
-          } else if (index == 2) {
-            // Navigate to Chats screen
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => const ChatsScreen(),
-              ),
-            );
-          } else if (index == 3) {
-            // Navigate to Profile screen
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => const NewUserProfileScreen(),
-              ),
-            );
-          }
         },
+        items: [
+          BottomNavigationBarItem(
+            icon: Image.asset(
+              'assets/images/tab1.png',
+              height: 30,
+              width: 30,
+              color:
+                  _selectedIndex == 0
+                      ? AppColors.primary
+                      : Colors.grey,
+            ),
+            label: '',
+          ),
+          BottomNavigationBarItem(
+            icon: Image.asset(
+              'assets/images/icons/tab2.png',
+              height: 24,
+              width: 24,
+              color: _selectedIndex == 1 ? AppColors.primary : Colors.grey,
+            ),
+            label: '',
+          ),
+        ],
+        backgroundColor: Colors.white,
+        elevation: 8,
+        selectedItemColor: AppColors.primary,
+        unselectedItemColor: Colors.grey,
+        showSelectedLabels: false,
+        showUnselectedLabels: false,
+        type: BottomNavigationBarType.fixed,
       ),
     );
   }
-} 
+}

@@ -8,10 +8,8 @@ import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 class MentorProfileScreen extends StatefulWidget {
   final String mentorId;
 
-  const MentorProfileScreen({
-    Key? key,
-    required this.mentorId,
-  }) : super(key: key);
+  const MentorProfileScreen({Key? key, required this.mentorId})
+    : super(key: key);
 
   @override
   State<MentorProfileScreen> createState() => _MentorProfileScreenState();
@@ -26,7 +24,9 @@ class _MentorProfileScreenState extends State<MentorProfileScreen> {
   @override
   void initState() {
     super.initState();
-    _loadMentorData();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _loadMentorData();
+    });
   }
 
   Future<void> _loadMentorData() async {
@@ -61,15 +61,28 @@ class _MentorProfileScreenState extends State<MentorProfileScreen> {
           onPressed: () => Navigator.pop(context),
         ),
       ),
-      body: _isLoading 
-          ? const Center(child: CircularProgressIndicator(color: Colors.white))
-          : _error != null
-              ? Center(child: Text(_error!, style: const TextStyle(color: Colors.white)))
+      body:
+          _isLoading
+              ? const Center(
+                child: CircularProgressIndicator(color: Colors.white),
+              )
+              : _error != null
+              ? Center(
+                child: Text(
+                  _error!,
+                  style: const TextStyle(color: Colors.white),
+                ),
+              )
               : _mentor == null
-                  ? const Center(child: Text('Mentor not found', style: TextStyle(color: Colors.white)))
-                  : !_mentor!.isActive
-                      ? _buildInactiveUserMessage()
-                      : _buildMentorProfile(),
+              ? const Center(
+                child: Text(
+                  'Mentor not found',
+                  style: TextStyle(color: Colors.white),
+                ),
+              )
+              : !_mentor!.isActive
+              ? _buildInactiveUserMessage()
+              : _buildMentorProfile(),
     );
   }
 
@@ -109,25 +122,22 @@ class _MentorProfileScreenState extends State<MentorProfileScreen> {
                 Text(
                   "The user account has been deactivated by an administrator.",
                   textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 16,
-                    color: Colors.grey[600],
-                  ),
+                  style: TextStyle(fontSize: 16, color: Colors.grey[600]),
                 ),
                 const SizedBox(height: 40),
                 ElevatedButton(
                   onPressed: () => Navigator.pop(context),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppTheme.primaryColor,
-                    padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 12),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 32,
+                      vertical: 12,
+                    ),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),
                     ),
                   ),
-                  child: const Text(
-                    'Go Back',
-                    style: TextStyle(fontSize: 16),
-                  ),
+                  child: const Text('Go Back', style: TextStyle(fontSize: 16)),
                 ),
               ],
             ),
@@ -155,18 +165,12 @@ class _MentorProfileScreenState extends State<MentorProfileScreen> {
           const SizedBox(height: 20),
           Text(
             _mentor!.name,
-            style: const TextStyle(
-              fontSize: 24,
-              fontWeight: FontWeight.bold,
-            ),
+            style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 5),
           Text(
             _mentor!.title ?? 'Mentor',
-            style: TextStyle(
-              fontSize: 16,
-              color: Colors.grey[600],
-            ),
+            style: TextStyle(fontSize: 16, color: Colors.grey[600]),
           ),
           const SizedBox(height: 20),
           _buildContactButton(),
@@ -197,9 +201,7 @@ class _MentorProfileScreenState extends State<MentorProfileScreen> {
         backgroundColor: AppTheme.primaryColor,
         foregroundColor: Colors.white,
         padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 12),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(30),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
       ),
     );
   }
@@ -207,9 +209,7 @@ class _MentorProfileScreenState extends State<MentorProfileScreen> {
   Widget _buildInfoCard(String title, String value, IconData icon) {
     return Card(
       elevation: 1,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-      ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Row(
@@ -221,10 +221,7 @@ class _MentorProfileScreenState extends State<MentorProfileScreen> {
               children: [
                 Text(
                   title,
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: Colors.grey[600],
-                  ),
+                  style: TextStyle(fontSize: 14, color: Colors.grey[600]),
                 ),
                 Text(
                   value,
@@ -240,4 +237,4 @@ class _MentorProfileScreenState extends State<MentorProfileScreen> {
       ),
     );
   }
-} 
+}

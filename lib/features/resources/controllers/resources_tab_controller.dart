@@ -24,14 +24,14 @@ class ResourcesTabController extends ChangeNotifier {
   final ChatController chatController;
 
   ResourcesTabController(this.context)
-      : authController = Provider.of<AuthController>(context, listen: false),
-        chatController = Provider.of<ChatController>(context, listen: false);
+    : authController = Provider.of<AuthController>(context, listen: false),
+      chatController = Provider.of<ChatController>(context, listen: false);
 
   Future<void> checkUserRole(BuildContext context) async {
     final authController = Provider.of<AuthController>(context, listen: false);
     final currentUser = authController.currentUser;
     final appUser = authController.appUser;
-    
+
     if (currentUser != null && appUser != null) {
       currentUserId = currentUser.uid;
       isAdmin = appUser.role == 'admin';
@@ -46,63 +46,74 @@ class ResourcesTabController extends ChangeNotifier {
 
   Future<List<ResourceItem>> fetchResources() async {
     List<ResourceItem> allResources = [];
-    
+
     // Fetch from resources collection
     if (selectedSourceFilter == 'All' || selectedSourceFilter == 'Resources') {
       var resourcesQuery = FirebaseFirestore.instance
-        .collection('resources')
-        .orderBy('dateAdded', descending: true);
-        
-      if (selectedResourceTypeFilter != null && selectedResourceTypeFilter != 'All') {
-        resourcesQuery = resourcesQuery.where('resourceType', isEqualTo: selectedResourceTypeFilter);
+          .collection('resources')
+          .orderBy('dateAdded', descending: true);
+
+      if (selectedResourceTypeFilter != null &&
+          selectedResourceTypeFilter != 'All') {
+        resourcesQuery = resourcesQuery.where(
+          'resourceType',
+          isEqualTo: selectedResourceTypeFilter,
+        );
       }
-      
+
       final snapshot = await resourcesQuery.get();
-      final resources = snapshot.docs.map((doc) {
-        ResourceItem item = ResourceItem.fromFirestore(doc);
-        item.sourceType = 'Resource';
-        return item;
-      }).toList();
-      
+      final resources =
+          snapshot.docs.map((doc) {
+            ResourceItem item = ResourceItem.fromFirestore(doc);
+            item.sourceType = 'Resource';
+            return item;
+          }).toList();
+
       allResources.addAll(resources);
     }
-    
+
     // Fetch from solo chats
     if (selectedSourceFilter == 'All' || selectedSourceFilter == 'Chats') {
       var chatsQuery = FirebaseFirestore.instance
           .collection('chats')
           .where('participantIds', arrayContains: currentUserId);
-      
+
       final chatSnapshot = await chatsQuery.get();
-      
+
       for (var chatDoc in chatSnapshot.docs) {
         final messagesQuery = FirebaseFirestore.instance
             .collection('chats')
             .doc(chatDoc.id)
             .collection('messages')
             .orderBy('timestamp', descending: true);
-        
+
         final messagesSnapshot = await messagesQuery.get();
-        
+
         for (var messageDoc in messagesSnapshot.docs) {
           final data = messageDoc.data();
-          if (data['fileUrl'] != null && data['fileUrl'] != '' && 
+          if (data['fileUrl'] != null &&
+              data['fileUrl'] != '' &&
               ((data['type'] != 'text' && data['type'] != 'audio') ||
-              ((data['fileType'] == 'image' || data['fileType'] == 'pdf')))) {
+                  ((data['fileType'] == 'image' ||
+                      data['fileType'] == 'pdf')))) {
             final chatData = chatDoc.data();
             final otherParticipant = (chatData['participantIds'] as List)
-                .firstWhere((id) => id != currentUserId, orElse: () => 'Unknown');
-            
-            final otherUserDoc = await FirebaseFirestore.instance
-                .collection('users')
-                .doc(otherParticipant)
-                .get();
-            
+                .firstWhere(
+                  (id) => id != currentUserId,
+                  orElse: () => 'Unknown',
+                );
+
+            final otherUserDoc =
+                await FirebaseFirestore.instance
+                    .collection('users')
+                    .doc(otherParticipant)
+                    .get();
+
             String otherUserName = 'Unknown User';
             if (otherUserDoc.exists) {
               otherUserName = otherUserDoc.data()?['name'] ?? 'Unknown User';
             }
-            
+
             ResourceItem resource = ResourceItem(
               id: messageDoc.id,
               title: data['fileName'] ?? data['mediaName'] ?? 'Shared File',
@@ -113,14 +124,17 @@ class ResourcesTabController extends ChangeNotifier {
               mentorId: data['senderId'] ?? data['userId'],
               mentorName: data['senderName'] ?? data['userName'] ?? 'Unknown',
               dateAdded: (data['timestamp'] as Timestamp).toDate(),
-              resourceType: data['fileType'] != null ? data['fileType'].toString().toUpperCase() : (data['type'] ?? 'other').toUpperCase(),
+              resourceType:
+                  data['fileType'] != null
+                      ? data['fileType'].toString().toUpperCase()
+                      : (data['type'] ?? 'other').toUpperCase(),
               chatId: chatDoc.id,
               chatName: otherUserName,
               sourceType: 'Chat',
             );
-            
-            if (selectedResourceTypeFilter == null || 
-                selectedResourceTypeFilter == 'All' || 
+
+            if (selectedResourceTypeFilter == null ||
+                selectedResourceTypeFilter == 'All' ||
                 selectedResourceTypeFilter == resource.resourceType) {
               allResources.add(resource);
             }
@@ -128,31 +142,34 @@ class ResourcesTabController extends ChangeNotifier {
         }
       }
     }
-    
+
     // Fetch from communities
-    if (selectedSourceFilter == 'All' || selectedSourceFilter == 'Communities') {
+    if (selectedSourceFilter == 'All' ||
+        selectedSourceFilter == 'Communities') {
       var communitiesQuery = FirebaseFirestore.instance
           .collection('communities')
           .where('memberIds', arrayContains: currentUserId);
-      
+
       final communitySnapshot = await communitiesQuery.get();
-      
+
       for (var communityDoc in communitySnapshot.docs) {
         final messagesQuery = FirebaseFirestore.instance
             .collection('communities')
             .doc(communityDoc.id)
             .collection('messages')
             .orderBy('timestamp', descending: true);
-        
+
         final messagesSnapshot = await messagesQuery.get();
-        
+
         for (var messageDoc in messagesSnapshot.docs) {
           final data = messageDoc.data();
-          if (data['fileUrl'] != null && data['fileUrl'] != '' && 
+          if (data['fileUrl'] != null &&
+              data['fileUrl'] != '' &&
               ((data['type'] != 'text' && data['type'] != 'audio') ||
-              ((data['fileType'] == 'image' || data['fileType'] == 'pdf')))) {
+                  ((data['fileType'] == 'image' ||
+                      data['fileType'] == 'pdf')))) {
             final communityData = communityDoc.data();
-            
+
             ResourceItem resource = ResourceItem(
               id: messageDoc.id,
               title: data['fileName'] ?? data['mediaName'] ?? 'Shared File',
@@ -163,14 +180,17 @@ class ResourcesTabController extends ChangeNotifier {
               mentorId: data['senderId'] ?? data['userId'],
               mentorName: data['senderName'] ?? data['userName'] ?? 'Unknown',
               dateAdded: (data['timestamp'] as Timestamp).toDate(),
-              resourceType: data['fileType'] != null ? data['fileType'].toString().toUpperCase() : (data['type'] ?? 'other').toUpperCase(),
+              resourceType:
+                  data['fileType'] != null
+                      ? data['fileType'].toString().toUpperCase()
+                      : (data['type'] ?? 'other').toUpperCase(),
               communityId: communityDoc.id,
               communityName: communityData['name'] ?? 'Unknown Community',
               sourceType: 'Community',
             );
-            
-            if (selectedResourceTypeFilter == null || 
-                selectedResourceTypeFilter == 'All' || 
+
+            if (selectedResourceTypeFilter == null ||
+                selectedResourceTypeFilter == 'All' ||
                 selectedResourceTypeFilter == resource.resourceType) {
               allResources.add(resource);
             }
@@ -178,7 +198,7 @@ class ResourcesTabController extends ChangeNotifier {
         }
       }
     }
-    
+
     // Sort by date
     allResources.sort((a, b) => b.dateAdded.compareTo(a.dateAdded));
     return allResources;
@@ -186,7 +206,10 @@ class ResourcesTabController extends ChangeNotifier {
 
   Future<void> openResource(BuildContext context, ResourceItem resource) async {
     if (resource.fileUrl == null) {
-      AppSnackbar.showError(context: context, message: 'No file available for this resource');
+      AppSnackbar.showError(
+        context: context,
+        message: 'No file available for this resource',
+      );
       return;
     }
 
@@ -195,73 +218,85 @@ class ResourcesTabController extends ChangeNotifier {
       if (await canLaunchUrl(url)) {
         await launchUrl(url, mode: LaunchMode.externalApplication);
       } else {
-        AppSnackbar.showError(context: context, message: 'Could not open the file');
+        AppSnackbar.showError(
+          context: context,
+          message: 'Could not open the file',
+        );
       }
     } catch (e) {
-      AppSnackbar.showError(context: context, message: 'Error opening resource: $e');
+      AppSnackbar.showError(
+        context: context,
+        message: 'Error opening resource: $e',
+      );
     }
   }
 
   Future<void> editResource(BuildContext context, ResourceItem resource) async {
     final titleController = TextEditingController(text: resource.title);
-    final descriptionController = TextEditingController(text: resource.description);
+    final descriptionController = TextEditingController(
+      text: resource.description,
+    );
     String selectedType = resource.type;
 
     final result = await showDialog<bool>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Edit Resource'),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: titleController,
-                decoration: const InputDecoration(
-                  labelText: 'Title',
-                  border: OutlineInputBorder(),
-                ),
+      builder:
+          (context) => AlertDialog(
+            title: const Text('Edit Resource'),
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TextField(
+                    controller: titleController,
+                    decoration: const InputDecoration(
+                      labelText: 'Title',
+                      border: OutlineInputBorder(),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  TextField(
+                    controller: descriptionController,
+                    decoration: const InputDecoration(
+                      labelText: 'Description',
+                      border: OutlineInputBorder(),
+                    ),
+                    maxLines: 3,
+                  ),
+                  const SizedBox(height: 16),
+                  DropdownButtonFormField<String>(
+                    value: selectedType,
+                    decoration: const InputDecoration(
+                      labelText: 'Resource Type',
+                      border: OutlineInputBorder(),
+                    ),
+                    items:
+                        ['pdf', 'doc', 'link', 'video', 'image', 'other'].map((
+                          type,
+                        ) {
+                          return DropdownMenuItem<String>(
+                            value: type,
+                            child: Text(type.toUpperCase()),
+                          );
+                        }).toList(),
+                    onChanged: (value) {
+                      selectedType = value!;
+                    },
+                  ),
+                ],
               ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: descriptionController,
-                decoration: const InputDecoration(
-                  labelText: 'Description',
-                  border: OutlineInputBorder(),
-                ),
-                maxLines: 3,
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: const Text('CANCEL'),
               ),
-              const SizedBox(height: 16),
-              DropdownButtonFormField<String>(
-                value: selectedType,
-                decoration: const InputDecoration(
-                  labelText: 'Resource Type',
-                  border: OutlineInputBorder(),
-                ),
-                items: ['pdf', 'doc', 'link', 'video', 'image', 'other'].map((type) {
-                  return DropdownMenuItem<String>(
-                    value: type,
-                    child: Text(type.toUpperCase()),
-                  );
-                }).toList(),
-                onChanged: (value) {
-                  selectedType = value!;
-                },
+              ElevatedButton(
+                onPressed: () => Navigator.pop(context, true),
+                child: const Text('SAVE'),
               ),
             ],
           ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('CANCEL'),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('SAVE'),
-          ),
-        ],
-      ),
     );
 
     if (result == true) {
@@ -270,37 +305,49 @@ class ResourcesTabController extends ChangeNotifier {
             .collection('resources')
             .doc(resource.id)
             .update({
-          'title': titleController.text.trim(),
-          'description': descriptionController.text.trim(),
-          'type': selectedType,
-          'lastUpdated': Timestamp.now(),
-        });
-        
-        AppSnackbar.showSuccess(context: context, message: 'Resource updated successfully');
+              'title': titleController.text.trim(),
+              'description': descriptionController.text.trim(),
+              'type': selectedType,
+              'lastUpdated': Timestamp.now(),
+            });
+
+        AppSnackbar.showSuccess(
+          context: context,
+          message: 'Resource updated successfully',
+        );
       } catch (e) {
-        AppSnackbar.showError(context: context, message: 'Failed to update resource: $e');
+        AppSnackbar.showError(
+          context: context,
+          message: 'Failed to update resource: $e',
+        );
       }
     }
   }
 
-  Future<void> deleteResource(BuildContext context, ResourceItem resource) async {
+  Future<void> deleteResource(
+    BuildContext context,
+    ResourceItem resource,
+  ) async {
     final result = await showDialog<bool>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Delete this resource?'),
-        content: Text('Are you sure you want to delete "${resource.title}"? This action cannot be undone.'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('CANCEL'),
+      builder:
+          (context) => AlertDialog(
+            title: const Text('Delete this resource?'),
+            content: Text(
+              'Are you sure you want to delete "${resource.title}"? This action cannot be undone.',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: const Text('CANCEL'),
+              ),
+              TextButton(
+                onPressed: () => Navigator.pop(context, true),
+                style: TextButton.styleFrom(foregroundColor: Colors.red),
+                child: const Text('DELETE'),
+              ),
+            ],
           ),
-          TextButton(
-            onPressed: () => Navigator.pop(context, true),
-            style: TextButton.styleFrom(foregroundColor: Colors.red),
-            child: const Text('DELETE'),
-          ),
-        ],
-      ),
     );
 
     if (result == true) {
@@ -308,12 +355,14 @@ class ResourcesTabController extends ChangeNotifier {
         // Delete file from storage if exists
         if (resource.fileUrl != null) {
           try {
-            await FirebaseStorage.instance.refFromURL(resource.fileUrl!).delete();
+            await FirebaseStorage.instance
+                .refFromURL(resource.fileUrl!)
+                .delete();
           } catch (e) {
             // File might not exist, continue with document deletion
           }
         }
-        
+
         // Delete document from Firestore
         if (resource.sourceType == 'Resource') {
           await FirebaseFirestore.instance
@@ -321,67 +370,79 @@ class ResourcesTabController extends ChangeNotifier {
               .doc(resource.id)
               .delete();
         }
-        
-        AppSnackbar.showSuccess(context: context, message: 'Resource deleted successfully');
+
+        AppSnackbar.showSuccess(
+          context: context,
+          message: 'Resource deleted successfully',
+        );
       } catch (e) {
-        AppSnackbar.showError(context: context, message: 'Failed to delete resource: $e');
+        AppSnackbar.showError(
+          context: context,
+          message: 'Failed to delete resource: $e',
+        );
       }
     }
   }
 
   void shareResource(BuildContext context, ResourceItem resource) {
-    AppSnackbar.showInfo(context: context, message: 'Sharing resource: ${resource.title}');
+    AppSnackbar.showInfo(
+      context: context,
+      message: 'Sharing resource: ${resource.title}',
+    );
   }
 
   void showResourceDetails(BuildContext context, ResourceItem resource) {
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: Text(resource.title),
-        content: SingleChildScrollView(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text('Type: ${resource.resourceType}'),
-              const SizedBox(height: 8),
-              Text('Description: ${resource.description}'),
-              const SizedBox(height: 8),
-              Text('File Format: ${resource.type.toUpperCase()}'),
-              const SizedBox(height: 8),
-              Text('Added by: ${resource.mentorName}'),
-              const SizedBox(height: 8),
-              Text('Added on: ${ResourceUtils.formatDate(resource.dateAdded)}'),
-              if (resource.fileName != null) ...[
-                const SizedBox(height: 8),
-                Text('File: ${resource.fileName}'),
-              ],
-              if (resource.sourceType == 'Chat') ...[
-                const SizedBox(height: 8),
-                Text('Source: Chat with ${resource.chatName}'),
-              ],
-              if (resource.sourceType == 'Community') ...[
-                const SizedBox(height: 8),
-                Text('Source: Community "${resource.communityName}"'),
-              ],
+      builder:
+          (context) => AlertDialog(
+            title: Text(resource.title),
+            content: SingleChildScrollView(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text('Type: ${resource.resourceType}'),
+                  const SizedBox(height: 8),
+                  Text('Description: ${resource.description}'),
+                  const SizedBox(height: 8),
+                  Text('File Format: ${resource.type.toUpperCase()}'),
+                  const SizedBox(height: 8),
+                  Text('Added by: ${resource.mentorName}'),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Added on: ${ResourceUtils.formatDate(resource.dateAdded)}',
+                  ),
+                  if (resource.fileName != null) ...[
+                    const SizedBox(height: 8),
+                    Text('File: ${resource.fileName}'),
+                  ],
+                  if (resource.sourceType == 'Chat') ...[
+                    const SizedBox(height: 8),
+                    Text('Source: Chat with ${resource.chatName}'),
+                  ],
+                  if (resource.sourceType == 'Community') ...[
+                    const SizedBox(height: 8),
+                    Text('Source: Community "${resource.communityName}"'),
+                  ],
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('CLOSE'),
+              ),
+              if (resource.fileUrl != null)
+                ElevatedButton(
+                  onPressed: () {
+                    Navigator.pop(context);
+                    openResource(context, resource);
+                  },
+                  child: const Text('OPEN'),
+                ),
             ],
           ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('CLOSE'),
-          ),
-          if (resource.fileUrl != null)
-            ElevatedButton(
-              onPressed: () {
-                Navigator.pop(context);
-                openResource(context, resource);
-              },
-              child: const Text('OPEN'),
-            ),
-        ],
-      ),
     );
   }
 
@@ -401,10 +462,11 @@ class ResourcesTabController extends ChangeNotifier {
   }
 
   bool canEditResource(ResourceItem resource) {
-    return isAdmin || 
-        (isMentor && resource.mentorId == currentUserId) || 
+    return isAdmin ||
+        (isMentor && resource.mentorId == currentUserId) ||
         (resource.sourceType == 'Chat' && resource.mentorId == currentUserId) ||
-        (resource.sourceType == 'Community' && resource.mentorId == currentUserId);
+        (resource.sourceType == 'Community' &&
+            resource.mentorId == currentUserId);
   }
 
   Future<void> createNewChat(Map<String, dynamic> student) async {
@@ -413,22 +475,18 @@ class ResourcesTabController extends ChangeNotifier {
 
     try {
       // Create or get existing conversation
-      final conversation = await chatController.createOneToOneConversation(
+      final conversation = await chatController.createConversation(
         participantId: student['id'],
         participantName: student['name'],
       );
-
-      if (conversation != null) {
-        // Navigate to chat
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) => ChatDetailScreen(
-              conversationId: conversation.id,
-            ),
-          ),
-        );
-      }
+      // Navigate to chat
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder:
+              (context) => ChatDetailScreen(conversationId: conversation.id),
+        ),
+      );
     } catch (e) {
       AppSnackbar.showError(
         context: context,
@@ -440,10 +498,7 @@ class ResourcesTabController extends ChangeNotifier {
   Future<void> deleteConversation(String conversationId) async {
     try {
       await chatController.deleteConversation(conversationId);
-      AppSnackbar.showInfo(
-        context: context,
-        message: 'Chat deleted',
-      );
+      AppSnackbar.showInfo(context: context, message: 'Chat deleted');
     } catch (e) {
       AppSnackbar.showError(
         context: context,
@@ -499,17 +554,11 @@ class ResourcesTabController extends ChangeNotifier {
 
   void archiveChat(String conversationId) {
     // Implement archive functionality
-    AppSnackbar.showInfo(
-      context: context,
-      message: 'Chat archived',
-    );
+    AppSnackbar.showInfo(context: context, message: 'Chat archived');
   }
 
   void muteNotifications(String conversationId) {
     // Implement mute functionality
-    AppSnackbar.showInfo(
-      context: context,
-      message: 'Notifications muted',
-    );
+    AppSnackbar.showInfo(context: context, message: 'Notifications muted');
   }
-} 
+}

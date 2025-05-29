@@ -43,7 +43,7 @@ class _CommunityChatScreenState extends State<CommunityChatScreen> {
     super.initState();
     currentUserId = FirebaseAuth.instance.currentUser?.uid;
     _messageController = MessageController();
-    
+
     // Schedule a post-frame callback to scroll to bottom after initial render
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _scrollToBottom();
@@ -77,27 +77,34 @@ class _CommunityChatScreenState extends State<CommunityChatScreen> {
   bool _canSendMessages(BuildContext context) {
     // First check if the user is a mentor
     final isMentor = _isMentor(context);
-    
+
     // If not a mentor, they can't send messages in mentor-only communities
     if (!isMentor) {
       return false;
     }
-    
+
     return true;
   }
 
-  Future<void> _sendMessage({String? text, File? mediaFile, String? mediaType, bool isOptimistic = false}) async {
+  Future<void> _sendMessage({
+    String? text,
+    File? mediaFile,
+    String? mediaType,
+    bool isOptimistic = false,
+  }) async {
     if (isOptimistic) {
       // Create a timestamp for the optimistic message
       final now = DateTime.now();
       final optimisticTimestamp = Timestamp.fromDate(now);
-      
+
       // Add message to optimistic list with proper initial values
       final optimisticMessage = {
         'id': 'temp_${now.millisecondsSinceEpoch}',
         'communityId': widget.communityId,
         'senderId': currentUserId,
-        'senderName': Provider.of<AuthController>(context, listen: false).appUser?.name ?? 'Unknown',
+        'senderName':
+            Provider.of<AuthController>(context, listen: false).appUser?.name ??
+            'Unknown',
         'text': text ?? '',
         'imageUrl': null,
         'fileUrl': null,
@@ -109,7 +116,7 @@ class _CommunityChatScreenState extends State<CommunityChatScreen> {
         'isOptimistic': true,
         'isUploading': true,
       };
-      
+
       setState(() {
         _optimisticMessages.add(optimisticMessage);
       });
@@ -134,9 +141,12 @@ class _CommunityChatScreenState extends State<CommunityChatScreen> {
     });
 
     try {
-      final chatController = Provider.of<ChatController>(context, listen: false);
+      final chatController = Provider.of<ChatController>(
+        context,
+        listen: false,
+      );
       String? fileUrl;
-      
+
       // Upload media file if present
       if (mediaFile != null) {
         // Update optimistic message to show upload in progress
@@ -170,14 +180,14 @@ class _CommunityChatScreenState extends State<CommunityChatScreen> {
         fileUrl: fileUrl,
         fileType: mediaType,
       );
-      
+
       // Remove optimistic message after successful send
       if (_optimisticMessages.isNotEmpty) {
         setState(() {
           _optimisticMessages.removeAt(0);
         });
       }
-      
+
       // Scroll to bottom again after sending the real message
       WidgetsBinding.instance.addPostFrameCallback((_) {
         _scrollToBottom();
@@ -191,10 +201,10 @@ class _CommunityChatScreenState extends State<CommunityChatScreen> {
           optimisticMessage['isUploading'] = false;
         });
       }
-      
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to send message: $e')),
-      );
+
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Failed to send message: $e')));
     } finally {
       setState(() {
         _isLoading = false;
@@ -222,20 +232,34 @@ class _CommunityChatScreenState extends State<CommunityChatScreen> {
             // Chat messages
             Expanded(
               child: StreamBuilder<List<Map<String, dynamic>>>(
-                stream: Provider.of<ChatController>(context).getCommunityMessagesStream(widget.communityId),
+                stream: Provider.of<ChatController>(
+                  context,
+                ).getCommunityMessagesStream(widget.communityId),
                 builder: (context, snapshot) {
-                  if (snapshot.connectionState == ConnectionState.waiting && !snapshot.hasData) {
+                  print(
+                    '[DEBUG] StreamBuilder snapshot: ' +
+                        snapshot.connectionState.toString() +
+                        ', hasData: ' +
+                        snapshot.hasData.toString() +
+                        ', error: ' +
+                        snapshot.error.toString(),
+                  );
+                  if (snapshot.connectionState == ConnectionState.waiting &&
+                      !snapshot.hasData) {
                     return const Center(child: CircularProgressIndicator());
                   }
-
                   if (snapshot.hasError) {
-                    return Center(child: Text('Error: ${snapshot.error}'));
+                    print(
+                      '[DEBUG] Error in message stream: ' +
+                          snapshot.error.toString(),
+                    );
+                    return Center(child: Text('Error: \\${snapshot.error}'));
                   }
 
                   // Combine real messages with optimistic messages
                   final realMessages = snapshot.data ?? [];
                   final allMessages = [...realMessages, ..._optimisticMessages];
-                  
+
                   // Sort messages by timestamp with null safety
                   allMessages.sort((a, b) {
                     // Helper function to safely get timestamp
@@ -249,7 +273,8 @@ class _CommunityChatScreenState extends State<CommunityChatScreen> {
                             return DateTime.now();
                           }
                         }
-                        if (message['createdAt'] != null && message['createdAt'] is Timestamp) {
+                        if (message['createdAt'] != null &&
+                            message['createdAt'] is Timestamp) {
                           return (message['createdAt'] as Timestamp).toDate();
                         }
                         // For optimistic messages or messages without timestamp
@@ -289,7 +314,7 @@ class _CommunityChatScreenState extends State<CommunityChatScreen> {
                 },
               ),
             ),
-            
+
             // Message input
             CommunityChatInput(
               onSendMessage: _sendMessage,
@@ -301,4 +326,4 @@ class _CommunityChatScreenState extends State<CommunityChatScreen> {
       ),
     );
   }
-} 
+}

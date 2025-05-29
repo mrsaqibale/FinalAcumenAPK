@@ -9,10 +9,7 @@ import 'package:provider/provider.dart';
 class AdminMentorList extends StatefulWidget {
   final UserController userController;
 
-  const AdminMentorList({
-    super.key,
-    required this.userController,
-  });
+  const AdminMentorList({super.key, required this.userController});
 
   @override
   State<AdminMentorList> createState() => _AdminMentorListState();
@@ -69,66 +66,76 @@ class _AdminMentorListState extends State<AdminMentorList> {
                   controller: controller.searchController,
                   decoration: InputDecoration(
                     hintText: 'Search by name, email, or employee ID',
-                    prefixIcon: const Icon(Icons.search, color: AppTheme.primaryColor),
-                    suffixIcon: controller.searchQuery.isNotEmpty
-                        ? IconButton(
-                            icon: const Icon(Icons.clear, color: Colors.grey),
-                            onPressed: controller.clearSearch,
-                          )
-                        : null,
+                    prefixIcon: const Icon(
+                      Icons.search,
+                      color: AppTheme.primaryColor,
+                    ),
+                    suffixIcon:
+                        controller.searchQuery.isNotEmpty
+                            ? IconButton(
+                              icon: const Icon(Icons.clear, color: Colors.grey),
+                              onPressed: controller.clearSearch,
+                            )
+                            : null,
                     filled: true,
                     fillColor: Colors.grey[100],
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
                       borderSide: BorderSide.none,
                     ),
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 12,
+                    ),
                   ),
                 ),
               ),
-              
+
               // Mentor list
               Expanded(
-                child: controller.filteredMentors.isEmpty
-                    ? Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(
-                              Icons.search_off,
-                              size: 48,
-                              color: Colors.grey[400],
-                            ),
-                            const SizedBox(height: 16),
-                            Text(
-                              controller.searchQuery.isEmpty
-                                  ? 'No mentors found'
-                                  : 'No mentors found matching "${controller.searchQuery}"',
-                              style: TextStyle(
-                                fontSize: 16,
-                                color: Colors.grey[600],
+                child:
+                    controller.filteredMentors.isEmpty
+                        ? Center(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                Icons.search_off,
+                                size: 48,
+                                color: Colors.grey[400],
                               ),
-                            ),
-                          ],
+                              const SizedBox(height: 16),
+                              Text(
+                                controller.searchQuery.isEmpty
+                                    ? 'No mentors found'
+                                    : 'No mentors found matching "${controller.searchQuery}"',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  color: Colors.grey[600],
+                                ),
+                              ),
+                            ],
+                          ),
+                        )
+                        : RefreshIndicator(
+                          onRefresh: controller.refreshMentors,
+                          child: ListView.builder(
+                            padding: const EdgeInsets.all(16),
+                            itemCount: controller.filteredMentors.length,
+                            physics: const BouncingScrollPhysics(),
+                            itemBuilder: (context, index) {
+                              final mentor = controller.filteredMentors[index];
+                              return MentorCard(
+                                mentor: mentor,
+                                onActiveStatusChanged:
+                                    controller.updateMentorActiveStatus,
+                                onApprovalStatusChanged:
+                                    controller.updateMentorApprovalStatus,
+                                onDelete: _handleDeleteMentor,
+                              );
+                            },
+                          ),
                         ),
-                      )
-                    : RefreshIndicator(
-                        onRefresh: controller.refreshMentors,
-                        child: ListView.builder(
-                          padding: const EdgeInsets.all(16),
-                          itemCount: controller.filteredMentors.length,
-                          physics: const BouncingScrollPhysics(),
-                          itemBuilder: (context, index) {
-                            final mentor = controller.filteredMentors[index];
-                            return MentorCard(
-                              mentor: mentor,
-                              onActiveStatusChanged: controller.updateMentorActiveStatus,
-                              onApprovalStatusChanged: controller.updateMentorApprovalStatus,
-                              onDelete: _handleDeleteMentor,
-                            );
-                          },
-                        ),
-                      ),
               ),
             ],
           );
@@ -136,4 +143,4 @@ class _AdminMentorListState extends State<AdminMentorList> {
       ),
     );
   }
-} 
+}

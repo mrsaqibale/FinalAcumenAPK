@@ -17,6 +17,7 @@ class ChatConversationAdapter extends TypeAdapter<ChatConversation> {
       hasUnreadMessages: reader.read(),
       isGroup: reader.read(),
       participantHasVerifiedSkills: reader.read(),
+      lastMessageSenderId: reader.read(),
     );
   }
 
@@ -31,6 +32,7 @@ class ChatConversationAdapter extends TypeAdapter<ChatConversation> {
     writer.write(obj.hasUnreadMessages);
     writer.write(obj.isGroup);
     writer.write(obj.participantHasVerifiedSkills);
+    writer.write(obj.lastMessageSenderId);
   }
 }
 
@@ -38,31 +40,34 @@ class ChatConversationAdapter extends TypeAdapter<ChatConversation> {
 class ChatConversation {
   @HiveField(0)
   final String id;
-  
+
   @HiveField(1)
   final String participantId;
-  
+
   @HiveField(2)
   final String participantName;
-  
+
   @HiveField(3)
   final String? participantImageUrl;
-  
+
   @HiveField(4)
   final String lastMessage;
-  
+
   @HiveField(5)
   final DateTime lastMessageTime;
-  
+
   @HiveField(6)
   final bool hasUnreadMessages;
-  
+
   @HiveField(7)
   final bool isGroup;
 
   @HiveField(8)
   final bool participantHasVerifiedSkills;
-  
+
+  @HiveField(9)
+  final String? lastMessageSenderId;
+
   ChatConversation({
     required this.id,
     required this.participantId,
@@ -73,14 +78,19 @@ class ChatConversation {
     this.hasUnreadMessages = false,
     this.isGroup = false,
     this.participantHasVerifiedSkills = false,
+    this.lastMessageSenderId,
   });
-  
+
   String get timeString {
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
     final yesterday = today.subtract(const Duration(days: 1));
-    final messageDate = DateTime(lastMessageTime.year, lastMessageTime.month, lastMessageTime.day);
-    
+    final messageDate = DateTime(
+      lastMessageTime.year,
+      lastMessageTime.month,
+      lastMessageTime.day,
+    );
+
     if (messageDate == today) {
       return '${lastMessageTime.hour.toString().padLeft(2, '0')}:${lastMessageTime.minute.toString().padLeft(2, '0')}';
     } else if (messageDate == yesterday) {
@@ -89,7 +99,7 @@ class ChatConversation {
       return '${lastMessageTime.day}/${lastMessageTime.month}/${lastMessageTime.year}';
     }
   }
-  
+
   ChatConversation copyWith({
     String? id,
     String? participantId,
@@ -100,6 +110,7 @@ class ChatConversation {
     bool? hasUnreadMessages,
     bool? isGroup,
     bool? participantHasVerifiedSkills,
+    String? lastMessageSenderId,
   }) {
     return ChatConversation(
       id: id ?? this.id,
@@ -110,7 +121,9 @@ class ChatConversation {
       lastMessageTime: lastMessageTime ?? this.lastMessageTime,
       hasUnreadMessages: hasUnreadMessages ?? this.hasUnreadMessages,
       isGroup: isGroup ?? this.isGroup,
-      participantHasVerifiedSkills: participantHasVerifiedSkills ?? this.participantHasVerifiedSkills,
+      participantHasVerifiedSkills:
+          participantHasVerifiedSkills ?? this.participantHasVerifiedSkills,
+      lastMessageSenderId: lastMessageSenderId ?? this.lastMessageSenderId,
     );
   }
-} 
+}

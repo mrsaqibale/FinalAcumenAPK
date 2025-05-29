@@ -12,26 +12,22 @@ import 'package:provider/provider.dart';
 import 'package:acumen/features/auth/controllers/auth_controller.dart';
 import 'package:acumen/features/chat/controllers/chat_controller.dart';
 
-
 class ChatsScreen extends StatefulWidget {
   final int initialTabIndex;
   final UserModel? selectedMentor;
 
-  const ChatsScreen({
-    super.key,
-    this.initialTabIndex = 0,
-    this.selectedMentor,
-  });
+  const ChatsScreen({super.key, this.initialTabIndex = 0, this.selectedMentor});
 
   @override
   State<ChatsScreen> createState() => _ChatsScreenState();
 }
 
-class _ChatsScreenState extends State<ChatsScreen> with SingleTickerProviderStateMixin {
+class _ChatsScreenState extends State<ChatsScreen>
+    with SingleTickerProviderStateMixin {
   late TabController _tabController;
-  
-  final List<String> _tabs = ['Solo', 'Community', 'Resources'];
-  
+
+  final List<String> _tabs = ['Solo', 'Community'];
+
   @override
   void initState() {
     super.initState();
@@ -50,35 +46,40 @@ class _ChatsScreenState extends State<ChatsScreen> with SingleTickerProviderStat
 
     // Fetch available communities for joining
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      Provider.of<ChatController>(context, listen: false).fetchAvailableCommunities();
+      Provider.of<ChatController>(
+        context,
+        listen: false,
+      ).fetchAvailableCommunities();
     });
   }
 
   Future<void> _createChatWithMentor(UserModel mentor) async {
     try {
-      final chatController = Provider.of<ChatController>(context, listen: false);
+      final chatController = Provider.of<ChatController>(
+        context,
+        listen: false,
+      );
       final conversation = await chatController.createConversation(
         participantId: mentor.id,
         participantName: mentor.name,
         participantImageUrl: mentor.photoUrl,
       );
-    
+
       if (!mounted) return;
-      
+
       // Navigate to the chat detail screen
       Navigator.push(
         context,
         MaterialPageRoute(
-          builder: (context) => ChatDetailScreen(
-            conversationId: conversation.id,
-          ),
+          builder:
+              (context) => ChatDetailScreen(conversationId: conversation.id),
         ),
       );
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to start chat: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Failed to start chat: $e')));
     }
   }
 
@@ -92,7 +93,7 @@ class _ChatsScreenState extends State<ChatsScreen> with SingleTickerProviderStat
   Widget build(BuildContext context) {
     final authController = Provider.of<AuthController>(context, listen: false);
     final chatController = Provider.of<ChatController>(context, listen: false);
-    
+
     return Scaffold(
       backgroundColor: AppTheme.primaryColor,
       appBar: AppBar(
@@ -120,10 +121,7 @@ class _ChatsScreenState extends State<ChatsScreen> with SingleTickerProviderStat
                 indicatorSize: TabBarIndicatorSize.tab,
                 indicator: BoxDecoration(
                   border: Border(
-                    bottom: BorderSide(
-                      color: Colors.white,
-                      width: 2.0,
-                    ),
+                    bottom: BorderSide(color: Colors.white, width: 2.0),
                   ),
                 ),
                 dividerHeight: 0,
@@ -160,23 +158,28 @@ class _ChatsScreenState extends State<ChatsScreen> with SingleTickerProviderStat
                 controller: _tabController,
                 children: [
                   const SoloChatsWidget(),
-                  const CommunityChatsWidget(),
-                  const ResourcesTabWidget(),
+                  const CommunityChatsWidget()
                 ],
               ),
             ),
           ),
         ],
       ),
-      floatingActionButton: (_tabController.index == 0) ? FloatingActionButton(
-        onPressed: () => NewChatDialogWidget.show(context),
-        backgroundColor: AppTheme.primaryColor,
-        child: const Icon(Icons.chat, color: Colors.white),
-      ) : (_tabController.index == 1 && chatController.canCreateCommunities(context)) ? FloatingActionButton(
-        onPressed: () => NewCommunityDialogWidget.show(context),
-        backgroundColor: AppTheme.primaryColor,
-        child: const Icon(Icons.group_add, color: Colors.white),
-      ) : null,
+      floatingActionButton:
+          (_tabController.index == 0)
+              ? FloatingActionButton(
+                onPressed: () => NewChatDialogWidget.show(context),
+                backgroundColor: AppTheme.primaryColor,
+                child: const Icon(Icons.chat, color: Colors.white),
+              )
+              : (_tabController.index == 1 &&
+                  chatController.canCreateCommunities(context))
+              ? FloatingActionButton(
+                onPressed: () => NewCommunityDialogWidget.show(context),
+                backgroundColor: AppTheme.primaryColor,
+                child: const Icon(Icons.group_add, color: Colors.white),
+              )
+              : null,
     );
   }
-} 
+}

@@ -23,22 +23,24 @@ class ChatController extends ChangeNotifier {
   List<ConversationModel> _availableCommunities = [];
   List<Map<String, dynamic>> _recentStudents = [];
   Map<String, List<ChatMessage>> _messagesCache = {};
-  
+
   // Stream subscriptions for real-time updates
   StreamSubscription? _conversationsSubscription;
   Map<String, StreamSubscription> _messageSubscriptions = {};
-  
+
   // Firestore references
   final _firestore = FirebaseFirestore.instance;
   final _usersCollection = FirebaseFirestore.instance.collection('users');
-  final _communitiesCollection = FirebaseFirestore.instance.collection('communities');
-  
+  final _communitiesCollection = FirebaseFirestore.instance.collection(
+    'communities',
+  );
+
   bool get isLoading => _isLoading;
   String? get error => _error;
   List<ChatConversation> get conversations => _conversations;
   List<ConversationModel> get availableCommunities => _availableCommunities;
   List<Map<String, dynamic>> get recentStudents => _recentStudents;
-  
+
   // Get a specific conversation by ID
   ChatConversation? getConversation(String id) {
     try {
@@ -47,28 +49,30 @@ class ChatController extends ChangeNotifier {
       return ChatService.getConversation(id);
     }
   }
-  
+
   ChatController() {
     _initializeChat();
   }
-  
+
   Future<void> _initializeChat() async {
     try {
       _isLoading = true;
       notifyListeners();
-      
+
       // Load conversations with real-time updates
       await _loadConversations();
-      
+
       // Setup real-time subscription for conversations
-      _conversationsSubscription = ChatService.getConversationsStream().listen((conversations) {
+      _conversationsSubscription = ChatService.getConversationsStream().listen((
+        conversations,
+      ) {
         _conversations = conversations;
         notifyListeners();
       });
-      
+
       // Load recent students
       await loadRecentStudents();
-      
+
       _isLoading = false;
       _error = null;
     } catch (e) {
@@ -81,7 +85,7 @@ class ChatController extends ChangeNotifier {
       notifyListeners();
     }
   }
-  
+
   // Load all conversations
   Future<void> _loadConversations() async {
     try {
@@ -91,20 +95,19 @@ class ChatController extends ChangeNotifier {
         notifyListeners();
         return;
       }
-      
+
       // Fetch conversations from Firebase
-      final firestoreConversations = await _firestore
-          .collection('conversations')
-          .where('members', arrayContains: currentUser.uid)
-          .orderBy('lastMessageAt', descending: true)
-          .get();
-      
-      // Convert to ChatConversation objects
+      final firestoreConversations =
+          await _firestore
+              .collection('conversations')
+              .where('members', arrayContains: currentUser.uid)
+              .orderBy('lastMessageAt', descending: true)
+              .get();
+
       List<ChatConversation> fetchedConversations = [];
       for (var doc in firestoreConversations.docs) {
         final data = doc.data();
-        
-        // Determine participant (the other user in the conversation)
+
         String participantId = '';
         List<String> members = List<String>.from(data['members'] ?? []);
         for (var memberId in members) {
@@ -113,58 +116,64 @@ class ChatController extends ChangeNotifier {
             break;
           }
         }
-        
-        // Skip if no participant found (should not happen)
+
         if (participantId.isEmpty && !data['isGroup']) continue;
-        
-        // For group chats, use the first member other than current user
         if (data['isGroup'] && participantId.isEmpty && members.isNotEmpty) {
           participantId = members.first;
         }
-        
-        // Convert timestamp to DateTime
+
+        // Always fetch the other user's name for DMs
+        String participantName = data['participantName'] ?? 'Unknown';
+        String? participantImageUrl = data['participantImageUrl'];
+        if (!(data['isGroup'] ?? false) && participantId.isNotEmpty) {
+          try {
+            final userDoc = await _usersCollection.doc(participantId).get();
+            if (userDoc.exists) {
+              final userData = userDoc.data() as Map<String, dynamic>;
+              participantName = userData['name'] ?? participantName;
+              participantImageUrl = userData['photoUrl'] ?? participantImageUrl;
+            }
+          } catch (e) {
+            // Ignore, fallback to Firestore data
+          }
+        }
+
         DateTime lastMessageTime = DateTime.now();
         if (data['lastMessageAt'] != null) {
           try {
             lastMessageTime = (data['lastMessageAt'] as Timestamp).toDate();
-          } catch (e) {
-            // Use current time as fallback
-          }
+          } catch (e) {}
         }
-        
-        // Create ChatConversation object
-        fetchedConversations.add(ChatConversation(
-          id: doc.id,
-          participantId: data['participantId'] ?? participantId,
-          participantName: data['participantName'] ?? 'Unknown',
-          participantImageUrl: data['participantImageUrl'],
-          lastMessage: data['lastMessage'] ?? '',
-          lastMessageTime: lastMessageTime,
-          hasUnreadMessages: data['hasUnreadMessages'] ?? false,
-          isGroup: data['isGroup'] ?? false,
-          participantHasVerifiedSkills: data['participantHasVerifiedSkills'] ?? false,
-        ));
+
+        fetchedConversations.add(
+          ChatConversation(
+            id: doc.id,
+            participantId: data['participantId'] ?? participantId,
+            participantName: participantName,
+            participantImageUrl: participantImageUrl,
+            lastMessage: data['lastMessage'] ?? '',
+            lastMessageTime: lastMessageTime,
+            hasUnreadMessages: data['hasUnreadMessages'] ?? false,
+            isGroup: data['isGroup'] ?? false,
+            participantHasVerifiedSkills:
+                data['participantHasVerifiedSkills'] ?? false,
+          ),
+        );
       }
-      
-      // Save to local Hive cache
+
       for (var conversation in fetchedConversations) {
         await ChatService.saveConversation(conversation);
       }
-      
-      // Update the conversations list
       _conversations = fetchedConversations;
     } catch (e) {
       if (kDebugMode) {
         print('Error loading conversations from Firebase: $e');
       }
-      
-      // Fall back to local cache if Firebase fails
       _conversations = ChatService.getConversations();
     }
-    
     notifyListeners();
   }
-  
+
   // Load recent students (registered in the last 30 days)
   Future<void> loadRecentStudents() async {
     try {
@@ -176,21 +185,24 @@ class ChatController extends ChangeNotifier {
       }
     }
   }
-  
+
   // Get messages for a conversation with real-time updates
   Future<List<ChatMessage>> getMessages(String conversationId) async {
     // Setup real-time listener if not already set up
     if (!_messageSubscriptions.containsKey(conversationId)) {
-      _messageSubscriptions[conversationId] = ChatService.getMessagesStream(conversationId).listen((messages) {
+      _messageSubscriptions[conversationId] = ChatService.getMessagesStream(
+        conversationId,
+      ).listen((messages) {
         _messagesCache[conversationId] = messages;
-        
+
         // Check for new messages and create notifications
         if (messages.isNotEmpty) {
           final latestMessage = messages.first;
           final conversation = getConversation(conversationId);
-          
-          if (conversation != null && 
-              latestMessage.senderId != FirebaseAuth.instance.currentUser?.uid) {
+
+          if (conversation != null &&
+              latestMessage.senderId !=
+                  FirebaseAuth.instance.currentUser?.uid) {
             // Create notification for new message
             _createMessageNotification(
               conversation: conversation,
@@ -198,26 +210,26 @@ class ChatController extends ChangeNotifier {
             );
           }
         }
-        
+
         notifyListeners();
       });
     }
-    
+
     // Try to get from cache first
     if (_messagesCache.containsKey(conversationId)) {
       return _messagesCache[conversationId]!;
     }
-    
+
     // Load from service
     final messages = await ChatService.getMessages(conversationId);
     _messagesCache[conversationId] = messages;
-    
+
     // Mark conversation as read
     await markConversationAsRead(conversationId);
-    
+
     return messages;
   }
-  
+
   // Create notification for new message
   void _createMessageNotification({
     required ChatConversation conversation,
@@ -228,7 +240,7 @@ class ChatController extends ChangeNotifier {
         navigatorKey.currentContext!,
         listen: false,
       );
-      
+
       notificationController.addMessageNotification(
         senderName: conversation.participantName,
         message: message.text,
@@ -241,11 +253,12 @@ class ChatController extends ChangeNotifier {
       }
     }
   }
-  
+
   // Send a message
   Future<void> sendMessage({
     required String conversationId,
     required String text,
+    required String receiverId,
     String? imageUrl,
   }) async {
     try {
@@ -253,13 +266,12 @@ class ChatController extends ChangeNotifier {
         conversationId: conversationId,
         text: text,
         imageUrl: imageUrl,
+        receiverId: receiverId,
       );
-      
       // Update cache
       if (_messagesCache.containsKey(conversationId)) {
         _messagesCache[conversationId]!.add(message);
       }
-      
       // Reload conversations to update last message
       await _loadConversations();
     } catch (e) {
@@ -269,12 +281,12 @@ class ChatController extends ChangeNotifier {
       rethrow;
     }
   }
-  
+
   // Mark a conversation as read
   Future<void> markConversationAsRead(String conversationId) async {
     try {
       await ChatService.markConversationAsRead(conversationId);
-      
+
       // Update conversations list
       await _loadConversations();
     } catch (e) {
@@ -283,42 +295,70 @@ class ChatController extends ChangeNotifier {
       }
     }
   }
-  
+
   // Create a new conversation
   Future<ChatConversation> createConversation({
     required String participantId,
     required String participantName,
     String? participantImageUrl,
     bool isGroup = false,
+    String? conversationId,
   }) async {
     try {
+      final currentUser = FirebaseAuth.instance.currentUser;
+      if (currentUser == null) {
+        throw Exception('User must be logged in to create a conversation');
+      }
+      // Always use unique chatroom ID for one-to-one chats
+      final convId =
+          isGroup
+              ? (conversationId ?? const Uuid().v4())
+              : ChatService.getConversationId(currentUser.uid, participantId);
+      // Check if conversation already exists
+      final existing = _conversations.firstWhere(
+        (c) => c.id == convId,
+        orElse:
+            () =>
+                ChatService.getConversation(convId) ??
+                ChatConversation(
+                  id: '',
+                  participantId: '',
+                  participantName: '',
+                  lastMessage: '',
+                  lastMessageTime: DateTime.now(),
+                  isGroup: false,
+                  participantHasVerifiedSkills: false,
+                ),
+      );
+      if (existing.id.isNotEmpty) {
+        return existing;
+      }
+      // Create a new conversation if not found
       final conversation = await ChatService.createConversation(
         participantId: participantId,
         participantName: participantName,
         participantImageUrl: participantImageUrl,
         isGroup: isGroup,
+        conversationId: convId,
       );
-      
-      // Reload conversations
       await _loadConversations();
-      
       return conversation;
     } catch (e) {
       if (kDebugMode) {
-        print('Error creating conversation: $e');
+        print('Error creating one-to-one conversation: $e');
       }
       rethrow;
     }
   }
-  
+
   // Delete a conversation
   Future<void> deleteConversation(String conversationId) async {
     try {
       await ChatService.deleteConversation(conversationId);
-      
+
       // Remove from cache
       _messagesCache.remove(conversationId);
-      
+
       // Reload conversations
       await _loadConversations();
     } catch (e) {
@@ -340,7 +380,7 @@ class ChatController extends ChangeNotifier {
     try {
       _isLoading = true;
       notifyListeners();
-      
+
       await ChatService.createCommunity(
         name: name,
         description: description,
@@ -348,9 +388,9 @@ class ChatController extends ChangeNotifier {
         imageUrl: imageUrl,
         isPublic: isPublic,
       );
-      
+
       // No need to manually reload as subscription will handle it
-      
+
       _isLoading = false;
       notifyListeners();
       return true;
@@ -363,13 +403,13 @@ class ChatController extends ChangeNotifier {
       return false;
     }
   }
-  
+
   // Fetch communities that the user can join
   Future<void> fetchAvailableCommunities() async {
     try {
       _isLoading = true;
       notifyListeners();
-      
+
       final currentUser = FirebaseAuth.instance.currentUser;
       if (currentUser == null) {
         if (kDebugMode) {
@@ -377,27 +417,31 @@ class ChatController extends ChangeNotifier {
         }
         return;
       }
-      
+
       // Get all communities and filter those that the user is not a member of
-      final communitiesSnapshot = await FirebaseFirestore.instance
-          .collection('communities')
-          .where('isPublic', isEqualTo: true)
-          .get();
-      
-      final userCommunitiesSnapshot = await FirebaseFirestore.instance
-          .collection('communities')
-          .where('members', arrayContains: currentUser.uid)
-          .get();
-      
+      final communitiesSnapshot =
+          await FirebaseFirestore.instance
+              .collection('communities')
+              .where('isPublic', isEqualTo: true)
+              .get();
+
+      final userCommunitiesSnapshot =
+          await FirebaseFirestore.instance
+              .collection('communities')
+              .where('members', arrayContains: currentUser.uid)
+              .get();
+
       // Extract the IDs of communities the user is already a member of
-      final userCommunityIds = userCommunitiesSnapshot.docs.map((doc) => doc.id).toSet();
-      
+      final userCommunityIds =
+          userCommunitiesSnapshot.docs.map((doc) => doc.id).toSet();
+
       // Filter out communities the user is already a member of
-      _availableCommunities = communitiesSnapshot.docs
-          .where((doc) => !userCommunityIds.contains(doc.id))
-          .map((doc) => ConversationModel.fromFirestore(doc))
-          .toList();
-      
+      _availableCommunities =
+          communitiesSnapshot.docs
+              .where((doc) => !userCommunityIds.contains(doc.id))
+              .map((doc) => ConversationModel.fromFirestore(doc))
+              .toList();
+
       _isLoading = false;
       notifyListeners();
     } catch (e) {
@@ -408,22 +452,19 @@ class ChatController extends ChangeNotifier {
       notifyListeners();
     }
   }
-  
+
   // Join a community
   Future<bool> joinCommunity({
     required String communityId,
     required String userId,
   }) async {
     try {
-      await ChatService.joinCommunity(
-        communityId: communityId,
-        userId: userId,
-      );
-      
+      await ChatService.joinCommunity(communityId: communityId, userId: userId);
+
       // Reload conversations and available communities
       await _loadConversations();
       await fetchAvailableCommunities();
-      
+
       return true;
     } catch (e) {
       if (kDebugMode) {
@@ -432,7 +473,7 @@ class ChatController extends ChangeNotifier {
       return false;
     }
   }
-  
+
   // Leave a community
   Future<bool> leaveCommunity({
     required String communityId,
@@ -443,10 +484,10 @@ class ChatController extends ChangeNotifier {
         communityId: communityId,
         userId: userId,
       );
-      
+
       // Reload conversations
       await _loadConversations();
-      
+
       return true;
     } catch (e) {
       if (kDebugMode) {
@@ -455,7 +496,7 @@ class ChatController extends ChangeNotifier {
       return false;
     }
   }
-  
+
   // Update community members (for teachers)
   Future<bool> updateCommunityMembers({
     required String communityId,
@@ -466,10 +507,10 @@ class ChatController extends ChangeNotifier {
         communityId: communityId,
         memberIds: memberIds,
       );
-      
+
       // Reload conversations
       await _loadConversations();
-      
+
       return true;
     } catch (e) {
       if (kDebugMode) {
@@ -478,35 +519,36 @@ class ChatController extends ChangeNotifier {
       return false;
     }
   }
-  
+
   // Check if user can create communities (mentors only)
   bool canCreateCommunities(BuildContext context) {
     final authController = Provider.of<AuthController>(context, listen: false);
     return authController.appUser?.role == 'mentor';
   }
-  
+
   // Check if user is community creator
   bool isCreator(String communityId, BuildContext context) {
     final authController = Provider.of<AuthController>(context, listen: false);
     final userId = authController.currentUser?.uid;
     if (userId == null) return false;
-    
+
     final community = availableCommunities.firstWhere(
       (c) => c.id == communityId,
-      orElse: () => ConversationModel(
-        id: '',
-        name: '',
-        members: [],
-        createdBy: '',
-        createdAt: DateTime.now(),
-        lastMessageAt: DateTime.now(),
-        isGroup: true,
-      ),
+      orElse:
+          () => ConversationModel(
+            id: '',
+            name: '',
+            members: [],
+            createdBy: '',
+            createdAt: DateTime.now(),
+            lastMessageAt: DateTime.now(),
+            isGroup: true,
+          ),
     );
-    
+
     return community.createdBy == userId;
   }
-  
+
   // Check if user is a mentor
   bool isMentor(BuildContext context) {
     final authController = Provider.of<AuthController>(context, listen: false);
@@ -528,20 +570,20 @@ class ChatController extends ChangeNotifier {
       print("DEBUG: Sending community message to community ID: $communityId");
       print("DEBUG: Message text: $text");
       print("DEBUG: File URL: $fileUrl, File Type: $fileType");
-      
+
       final currentUser = FirebaseAuth.instance.currentUser;
       if (currentUser == null) {
         throw Exception('User not authenticated');
       }
-      
+
       // Get current user's data including verified skills status
       final userDoc = await _usersCollection.doc(currentUser.uid).get();
       final userData = userDoc.data() as Map<String, dynamic>;
       final hasVerifiedSkills = userData['hasVerifiedSkills'] ?? false;
-      
+
       // Create a server timestamp
       final serverTimestamp = FieldValue.serverTimestamp();
-      
+
       // Create message document with explicit timestamp
       final messageData = {
         'id': const Uuid().v4(),
@@ -553,26 +595,30 @@ class ChatController extends ChangeNotifier {
         'createdAt': serverTimestamp, // Add a backup timestamp field
         'type': 'message',
         'fileUrl': fileUrl,
-        'imageUrl': fileUrl, // Set imageUrl to be the same as fileUrl for backward compatibility
+        'imageUrl':
+            fileUrl, // Set imageUrl to be the same as fileUrl for backward compatibility
         'fileType': fileType,
-        'contentType': fileType, // Set contentType to be the same as fileType for UI rendering
+        'contentType':
+            fileType, // Set contentType to be the same as fileType for UI rendering
         'replyToMessageId': replyToMessageId,
         'replyToSenderName': replyToSenderName,
         'replyToText': replyToText,
         'forwardedFromName': forwardedFromName,
       };
-      
-      print("DEBUG: Adding message to Firestore path: communities/$communityId/messages");
+
+      print(
+        "DEBUG: Adding message to Firestore path: communities/$communityId/messages",
+      );
       print("DEBUG: Message data: $messageData");
-      
+
       // Add message to community
       await _communitiesCollection
           .doc(communityId)
           .collection('messages')
           .add(messageData);
-      
+
       print("DEBUG: Message added successfully");
-      
+
       // Update community's last message with explicit timestamp
       await _communitiesCollection.doc(communityId).update({
         'lastMessage': text,
@@ -580,7 +626,7 @@ class ChatController extends ChangeNotifier {
         'lastMessageAt': serverTimestamp,
         'updatedAt': serverTimestamp, // Add a backup timestamp field
       });
-      
+
       print("DEBUG: Community last message updated");
     } catch (e) {
       print("DEBUG: Error sending community message: $e");
@@ -590,11 +636,13 @@ class ChatController extends ChangeNotifier {
       rethrow;
     }
   }
-  
+
   // Get community messages stream
-  Stream<List<Map<String, dynamic>>> getCommunityMessagesStream(String communityId) {
+  Stream<List<Map<String, dynamic>>> getCommunityMessagesStream(
+    String communityId,
+  ) {
     print("DEBUG: Getting messages stream for community ID: $communityId");
-    
+
     return ChatService.getCommunityMessagesStream(communityId).map((messages) {
       print("DEBUG: Received ${messages.length} messages from stream");
       if (messages.isNotEmpty) {
@@ -603,100 +651,83 @@ class ChatController extends ChangeNotifier {
       return messages;
     });
   }
-  
+
   // Get communities the current user is a member of
   Stream<List<Map<String, dynamic>>> getUserCommunitiesStream() {
     return ChatService.getUserCommunitiesStream();
   }
-  
+
   // Get community messages with only media content for resources tab
-  Stream<List<Map<String, dynamic>>> getCommunityMediaMessagesStream(String communityId) {
-    return ChatService.getCommunityMessagesStream(communityId)
-        .map((messages) => messages.where((message) {
-              // Check if this message has media content
-              final String contentType = message['contentType'] as String? ?? 'text';
-              final String? imageUrl = message['imageUrl'] as String?;
-              
-              // Return only messages with media content (not text or voice)
-              return (contentType != 'text' && contentType != 'voice' && 
-                     imageUrl != null && imageUrl.isNotEmpty);
-            }).toList());
+  Stream<List<Map<String, dynamic>>> getCommunityMediaMessagesStream(
+    String communityId,
+  ) {
+    return ChatService.getCommunityMessagesStream(communityId).map(
+      (messages) =>
+          messages.where((message) {
+            // Check if this message has media content
+            final String contentType =
+                message['contentType'] as String? ?? 'text';
+            final String? imageUrl = message['imageUrl'] as String?;
+
+            // Return only messages with media content (not text or voice)
+            return (contentType != 'text' &&
+                contentType != 'voice' &&
+                imageUrl != null &&
+                imageUrl.isNotEmpty);
+          }).toList(),
+    );
   }
-  
+
   // Get solo chat messages with only media content for My Chats tab in resources
   Stream<List<ChatMessage>> getSoloMediaMessagesStream(String conversationId) {
     if (!_messageSubscriptions.containsKey(conversationId)) {
       // Return empty stream initially
       return Stream.value([]);
     }
-    
-    return ChatService.getMessagesStream(conversationId)
-        .map((messages) => messages.where((message) {
-              // Check if this message has media content (fileUrl is not null)
-              return message.fileUrl != null && message.fileUrl!.isNotEmpty;
-            }).toList());
+
+    return ChatService.getMessagesStream(conversationId).map(
+      (messages) =>
+          messages.where((message) {
+            // Check if this message has media content (fileUrl is not null)
+            return message.fileUrl != null && message.fileUrl!.isNotEmpty;
+          }).toList(),
+    );
   }
-  
+
   // Check if a conversation has any media messages
   Future<bool> conversationHasMediaMessages(String conversationId) async {
     try {
       print("DEBUG: Checking media messages for conversation $conversationId");
-      
+
       // Query Firestore directly for messages with fileUrl
-      final messagesSnapshot = await FirebaseFirestore.instance
-          .collection('chats')
-          .doc(conversationId)
-          .collection('messages')
-          .where('fileUrl', isNotEqualTo: null)
-          .limit(1)
-          .get();
+      final messagesSnapshot =
+          await FirebaseFirestore.instance
+              .collection('chats')
+              .doc(conversationId)
+              .collection('messages')
+              .where('fileUrl', isNotEqualTo: null)
+              .limit(1)
+              .get();
 
       final hasMedia = messagesSnapshot.docs.isNotEmpty;
       print("DEBUG: Conversation $conversationId has media: $hasMedia");
-      
+
       if (hasMedia) {
         print("DEBUG: Found media message in conversation $conversationId");
       }
-      
+
       return hasMedia;
     } catch (e) {
-      print("DEBUG: Error checking media messages for conversation $conversationId: $e");
+      print(
+        "DEBUG: Error checking media messages for conversation $conversationId: $e",
+      );
       return false;
     }
   }
 
-  // Create or get existing one-to-one conversation
-  Future<ChatConversation?> createOneToOneConversation({
-    required String participantId,
-    required String participantName,
-  }) async {
-    try {
-      final currentUser = FirebaseAuth.instance.currentUser;
-      if (currentUser == null) {
-        if (kDebugMode) {
-          print('Error creating conversation: User is not authenticated');
-        }
-        return null;
-      }
-      
-      // Check if conversation already exists
-      for (var conversation in _conversations) {
-        if (!conversation.isGroup && conversation.participantId == participantId) {
-          return conversation;
-        }
-      }
-
-      // Create a new conversation
-      return await createConversation(
-        participantId: participantId,
-        participantName: participantName,
-      );
-    } catch (e) {
-      if (kDebugMode) {
-        print('Error creating one-to-one conversation: $e');
-      }
-      return null;
-    }
+  String getConversationId(String userId1, String userId2) {
+    final ids = [userId1, userId2]..sort();
+    return ids.join('_');
   }
 
   @override
@@ -708,4 +739,8 @@ class ChatController extends ChangeNotifier {
     }
     super.dispose();
   }
-} 
+
+  Future<void> reloadConversations() async {
+    await _loadConversations();
+  }
+}

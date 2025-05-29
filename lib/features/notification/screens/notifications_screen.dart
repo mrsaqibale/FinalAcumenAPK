@@ -32,17 +32,18 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
 
   Future<void> _initializeNotifications() async {
     if (_isInitialized) return;
-    
+
     try {
       // Check if notifications are enabled in settings
       final areEnabled = await SettingsController.areNotificationsEnabled();
       if (!mounted) return;
-      
+
       setState(() {
         _areNotificationsEnabled = areEnabled;
-        _isLoading = areEnabled; // Only show loading if notifications are enabled
+        _isLoading =
+            areEnabled; // Only show loading if notifications are enabled
       });
-      
+
       if (!_areNotificationsEnabled) {
         setState(() {
           _isInitialized = true;
@@ -50,21 +51,29 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         });
         return;
       }
-      
-      final notificationController = Provider.of<NotificationController>(context, listen: false);
-      final eventController = Provider.of<EventController>(context, listen: false);
-      
+
+      final notificationController = Provider.of<NotificationController>(
+        context,
+        listen: false,
+      );
+      final eventController = Provider.of<EventController>(
+        context,
+        listen: false,
+      );
+
       // Load events and notifications in parallel
       try {
         await Future.wait([
           notificationController.loadNotifications(),
           eventController.loadEvents(),
         ]);
-        
+
         if (!mounted) return;
-        
+
         // Sync notifications with active events
-        await notificationController.syncWithEvents(eventController.activeEvents);
+        await notificationController.syncWithEvents(
+          eventController.activeEvents,
+        );
       } catch (e) {
         if (kDebugMode) {
           print('Error loading notifications or events: $e');
@@ -86,23 +95,29 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
 
   Future<void> _refreshNotifications() async {
     if (!_areNotificationsEnabled) return;
-    
+
     setState(() {
       _isLoading = true;
     });
-    
+
     try {
-      final notificationController = Provider.of<NotificationController>(context, listen: false);
-      final eventController = Provider.of<EventController>(context, listen: false);
-      
+      final notificationController = Provider.of<NotificationController>(
+        context,
+        listen: false,
+      );
+      final eventController = Provider.of<EventController>(
+        context,
+        listen: false,
+      );
+
       // Load events and notifications in parallel
       await Future.wait([
         notificationController.loadNotifications(),
         eventController.loadEvents(),
       ]);
-      
+
       if (!mounted) return;
-      
+
       // Sync notifications with active events
       await notificationController.syncWithEvents(eventController.activeEvents);
     } catch (e) {
@@ -121,9 +136,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   void _navigateToDashboard() {
     // Clear the navigation stack and push the dashboard screen
     Navigator.of(context).pushAndRemoveUntil(
-      MaterialPageRoute(
-        builder: (context) => const DashboardScreen(),
-      ),
+      MaterialPageRoute(builder: (context) => const DashboardScreen()),
       (route) => false,
     );
   }
@@ -136,72 +149,79 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   @override
   Widget build(BuildContext context) {
     if (!_isInitialized) {
-      return const Scaffold(
-        body: Center(
-          child: CircularProgressIndicator(),
-        ),
-      );
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
 
-    return Scaffold(
-      backgroundColor: AppTheme.primaryColor,
-      appBar: AppBar(
+    return WillPopScope(
+      onWillPop: () async {
+        _navigateToDashboard();
+        return false;
+      },
+      child: Scaffold(
         backgroundColor: AppTheme.primaryColor,
-        elevation: 0,
-        title: const Text(
-          'Notifications',
-          style: TextStyle(
-            color: Colors.white,
-            fontWeight: FontWeight.bold,
-            fontSize: 20,
-          ),
-        ),
-        centerTitle: true,
-        leading: IconButton(
-          icon: const Icon(FontAwesomeIcons.angleLeft, color: Colors.white),
-          onPressed: _navigateToDashboard,
-        ),
-        actions: [
-          if (_areNotificationsEnabled)
-            PopupMenuButton<String>(
-              icon: const Icon(Icons.more_vert, color: Colors.white),
-              onSelected: (value) {
-                if (value == 'mark_all_read') {
-                  Provider.of<NotificationController>(context, listen: false).markAllAsRead();
-                } else if (value == 'clear_all') {
-                  _showClearConfirmation();
-                }
-              },
-              itemBuilder: (context) => [
-                const PopupMenuItem(
-                  value: 'mark_all_read',
-                  child: Text('Mark all as read'),
-                ),
-                const PopupMenuItem(
-                  value: 'clear_all',
-                  child: Text('Clear all notifications'),
-                ),
-              ],
+        appBar: AppBar(
+          backgroundColor: AppTheme.primaryColor,
+          elevation: 0,
+          title: const Text(
+            'Notifications',
+            style: TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.bold,
+              fontSize: 20,
             ),
-        ],
-      ),
-      body: Container(
-        decoration: BoxDecoration(
-          color: Colors.grey[50],
-          borderRadius: const BorderRadius.only(
-            topLeft: Radius.circular(30),
-            topRight: Radius.circular(30),
           ),
+          centerTitle: true,
+          leading: IconButton(
+            icon: const Icon(FontAwesomeIcons.angleLeft, color: Colors.white),
+            onPressed: _navigateToDashboard,
+          ),
+          actions: [
+            if (_areNotificationsEnabled)
+              PopupMenuButton<String>(
+                icon: const Icon(Icons.more_vert, color: Colors.white),
+                onSelected: (value) {
+                  if (value == 'mark_all_read') {
+                    Provider.of<NotificationController>(
+                      context,
+                      listen: false,
+                    ).markAllAsRead();
+                  } else if (value == 'clear_all') {
+                    _showClearConfirmation();
+                  }
+                },
+                itemBuilder:
+                    (context) => [
+                      const PopupMenuItem(
+                        value: 'mark_all_read',
+                        child: Text('Mark all as read'),
+                      ),
+                      const PopupMenuItem(
+                        value: 'clear_all',
+                        child: Text('Clear all notifications'),
+                      ),
+                    ],
+              ),
+          ],
         ),
-        clipBehavior: Clip.antiAlias,
-        child: !_areNotificationsEnabled 
-            ? _buildNotificationsDisabledMessage()
-            : _isLoading
-                ? const Center(child: CircularProgressIndicator())
-                : Consumer<NotificationController>(
+        body: Container(
+          decoration: BoxDecoration(
+            color: Colors.grey[50],
+            borderRadius: const BorderRadius.only(
+              topLeft: Radius.circular(30),
+              topRight: Radius.circular(30),
+            ),
+          ),
+          clipBehavior: Clip.antiAlias,
+          child:
+              !_areNotificationsEnabled
+                  ? _buildNotificationsDisabledMessage()
+                  : _isLoading
+                  ? const Center(child: CircularProgressIndicator())
+                  : Consumer<NotificationController>(
                     builder: (context, notificationController, child) {
-                      final notifications = notificationController.notifications;
-                      
+                      final notifications =
+                          notificationController.notifications;
+
                       if (notifications.isEmpty) {
                         return Center(
                           child: Column(
@@ -233,7 +253,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                           ),
                         );
                       }
-                      
+
                       return RefreshIndicator(
                         onRefresh: _refreshNotifications,
                         child: ListView.builder(
@@ -244,14 +264,20 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                             final notification = notifications[index];
                             return NotificationCardWidget(
                               notification: notification,
-                              onMarkAsRead: () => notificationController.markAsRead(notification.id),
-                              onDelete: () => notificationController.deleteNotification(notification.id),
+                              onMarkAsRead:
+                                  () => notificationController.markAsRead(
+                                    notification.id,
+                                  ),
+                              onDelete:
+                                  () => notificationController
+                                      .deleteNotification(notification.id),
                             );
                           },
                         ),
                       );
                     },
                   ),
+        ),
       ),
     );
   }
@@ -281,10 +307,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
             child: Text(
               'You need to enable notifications in settings to receive updates',
               textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: 16,
-                color: Colors.grey[600],
-              ),
+              style: TextStyle(fontSize: 16, color: Colors.grey[600]),
             ),
           ),
           const SizedBox(height: 32),
@@ -304,23 +327,32 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   void _showClearConfirmation() {
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Clear all notifications?'),
-        content: const Text('This will remove all notifications. This action cannot be undone.'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('CANCEL'),
+      builder:
+          (context) => AlertDialog(
+            title: const Text('Clear all notifications?'),
+            content: const Text(
+              'This will remove all notifications. This action cannot be undone.',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('CANCEL'),
+              ),
+              TextButton(
+                onPressed: () {
+                  Navigator.pop(context);
+                  Provider.of<NotificationController>(
+                    context,
+                    listen: false,
+                  ).clearAllNotifications();
+                },
+                child: const Text(
+                  'CLEAR ALL',
+                  style: TextStyle(color: Colors.red),
+                ),
+              ),
+            ],
           ),
-          TextButton(
-            onPressed: () {
-              Navigator.pop(context);
-              Provider.of<NotificationController>(context, listen: false).clearAllNotifications();
-            },
-            child: const Text('CLEAR ALL', style: TextStyle(color: Colors.red)),
-          ),
-        ],
-      ),
     );
   }
-} 
+}

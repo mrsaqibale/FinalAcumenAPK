@@ -28,7 +28,11 @@ class ChatMessageItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if ((message.fileType == null || message.fileType == 'text') && !isTempMessage) {
+    print(
+      '[ChatMessageItem] Rendering: id=[33m${message.id}[0m, text="${message.text}", senderId=${message.senderId}, fileType=${message.fileType}, isTempMessage=$isTempMessage',
+    );
+    if ((message.fileType == null || message.fileType == 'text') &&
+        !isTempMessage) {
       return _buildTextMessage();
     }
 
@@ -54,9 +58,7 @@ class ChatMessageItem extends StatelessWidget {
           children: [
             Text(
               message.text,
-              style: TextStyle(
-                color: isMine ? Colors.white : Colors.black,
-              ),
+              style: TextStyle(color: isMine ? Colors.white : Colors.black),
             ),
             const SizedBox(height: 4),
             Text(
@@ -104,7 +106,12 @@ class ChatMessageItem extends StatelessWidget {
                       child: Image.file(
                         File(message.fileUrl ?? ''),
                         fit: BoxFit.cover,
-                        errorBuilder: (_, __, ___) => const Icon(Icons.image, size: 50, color: Colors.white54),
+                        errorBuilder:
+                            (_, __, ___) => const Icon(
+                              Icons.image,
+                              size: 50,
+                              color: Colors.white54,
+                            ),
                       ),
                     ),
                   ),
@@ -115,12 +122,19 @@ class ChatMessageItem extends StatelessWidget {
                     strokeWidth: 5,
                   ),
                   if (isComplete)
-                    const Icon(Icons.check_circle, color: Colors.green, size: 40)
+                    const Icon(
+                      Icons.check_circle,
+                      color: Colors.green,
+                      size: 40,
+                    ),
                 ],
               )
             else
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 8,
+                ),
                 decoration: BoxDecoration(
                   color: Colors.white,
                   borderRadius: BorderRadius.circular(12),
@@ -129,11 +143,15 @@ class ChatMessageItem extends StatelessWidget {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Icon(
-                      message.fileType == 'pdf' ? Icons.picture_as_pdf :
-                      message.fileType == 'video' ? Icons.video_library :
-                      message.fileType == 'audio' ? Icons.audio_file :
-                      message.fileType == 'zip' ? Icons.folder_zip :
-                      Icons.insert_drive_file,
+                      message.fileType == 'pdf'
+                          ? Icons.picture_as_pdf
+                          : message.fileType == 'video'
+                          ? Icons.video_library
+                          : message.fileType == 'audio'
+                          ? Icons.audio_file
+                          : message.fileType == 'zip'
+                          ? Icons.folder_zip
+                          : Icons.insert_drive_file,
                       color: Colors.grey[700],
                     ),
                     const SizedBox(width: 8),
@@ -143,23 +161,26 @@ class ChatMessageItem extends StatelessWidget {
                         message.fileName ?? 'File',
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          color: Colors.grey[700],
-                        ),
+                        style: TextStyle(color: Colors.grey[700]),
                       ),
                     ),
                     const SizedBox(width: 8),
                     SizedBox(
                       width: 24,
                       height: 24,
-                      child: isComplete
-                          ? const Icon(Icons.check_circle, color: Colors.green, size: 24)
-                          : CircularProgressIndicator(
-                              value: progress,
-                              backgroundColor: Colors.grey[300],
-                              color: AppTheme.primaryColor,
-                              strokeWidth: 2,
-                            ),
+                      child:
+                          isComplete
+                              ? const Icon(
+                                Icons.check_circle,
+                                color: Colors.green,
+                                size: 24,
+                              )
+                              : CircularProgressIndicator(
+                                value: progress,
+                                backgroundColor: Colors.grey[300],
+                                color: AppTheme.primaryColor,
+                                strokeWidth: 2,
+                              ),
                     ),
                   ],
                 ),
@@ -167,10 +188,7 @@ class ChatMessageItem extends StatelessWidget {
             const SizedBox(height: 4),
             Text(
               'Uploading... ${(progress * 100).toInt()}%',
-              style: TextStyle(
-                fontSize: 10,
-                color: Colors.grey[700],
-              ),
+              style: TextStyle(fontSize: 10, color: Colors.grey[700]),
             ),
           ],
         ),
@@ -200,7 +218,9 @@ class ChatMessageItem extends StatelessWidget {
             else
               _buildDocumentMessage(context),
             const SizedBox(height: 4),
-            if (message.text.isNotEmpty && message.text != 'Voice message' && !message.text.contains('Sent a file'))
+            if (message.text.isNotEmpty &&
+                message.text != 'Voice message' &&
+                !message.text.contains('Sent a file'))
               Padding(
                 padding: const EdgeInsets.only(top: 4, left: 4, right: 4),
                 child: Text(
@@ -245,7 +265,7 @@ class ChatMessageItem extends StatelessWidget {
       child: GestureDetector(
         onTap: () {
           if (message.fileUrl == null) return;
-          
+
           _openImageViewer(context);
         },
         child: Hero(
@@ -255,43 +275,49 @@ class ChatMessageItem extends StatelessWidget {
             width: 200,
             height: 150,
             fit: BoxFit.cover,
-            placeholder: (context, url) => Container(
-              width: 200,
-              height: 150,
-              color: Colors.grey[300],
-              child: const Center(child: CircularProgressIndicator()),
-            ),
-            errorWidget: (context, url, error) => Container(
-              width: 200,
-              height: 150,
-              color: Colors.grey[300],
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Icon(Icons.broken_image, size: 40, color: Colors.grey),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Image not available',
-                    style: TextStyle(color: Colors.grey[600], fontSize: 12),
+            placeholder:
+                (context, url) => Container(
+                  width: 200,
+                  height: 150,
+                  color: Colors.grey[300],
+                  child: const Center(child: CircularProgressIndicator()),
+                ),
+            errorWidget:
+                (context, url, error) => Container(
+                  width: 200,
+                  height: 150,
+                  color: Colors.grey[300],
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Icon(
+                        Icons.broken_image,
+                        size: 40,
+                        color: Colors.grey,
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        'Image not available',
+                        style: TextStyle(color: Colors.grey[600], fontSize: 12),
+                      ),
+                      TextButton(
+                        onPressed: () {
+                          if (message.fileUrl != null) {
+                            try {
+                              launchUrl(Uri.parse(message.fileUrl!));
+                            } catch (e) {
+                              AppSnackbar.showError(
+                                context: context,
+                                message: 'Could not open image: $e',
+                              );
+                            }
+                          }
+                        },
+                        child: const Text('Try opening in browser'),
+                      ),
+                    ],
                   ),
-                  TextButton(
-                    onPressed: () {
-                      if (message.fileUrl != null) {
-                        try {
-                          launchUrl(Uri.parse(message.fileUrl!));
-                        } catch (e) {
-                          AppSnackbar.showError(
-                            context: context, 
-                            message: 'Could not open image: $e'
-                          );
-                        }
-                      }
-                    },
-                    child: const Text('Try opening in browser'),
-                  ),
-                ],
-              ),
-            ),
+                ),
           ),
         ),
       ),
@@ -301,11 +327,12 @@ class ChatMessageItem extends StatelessWidget {
   void _openImageViewer(BuildContext context) {
     Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (_) => _FullScreenImageViewer(
-          imageUrl: message.fileUrl!,
-          messageId: message.id,
-          fileName: message.fileName ?? 'image.jpg',
-        ),
+        builder:
+            (_) => _FullScreenImageViewer(
+              imageUrl: message.fileUrl!,
+              messageId: message.id,
+              fileName: message.fileName ?? 'image.jpg',
+            ),
       ),
     );
   }
@@ -319,10 +346,16 @@ class ChatMessageItem extends StatelessWidget {
             if (await canLaunchUrl(url)) {
               await launchUrl(url);
             } else {
-              AppSnackbar.showError(context: context, message: 'Cannot open file');
+              AppSnackbar.showError(
+                context: context,
+                message: 'Cannot open file',
+              );
             }
           } catch (e) {
-            AppSnackbar.showError(context: context, message: 'Error opening file: $e');
+            AppSnackbar.showError(
+              context: context,
+              message: 'Error opening file: $e',
+            );
           }
         }
       },
@@ -342,9 +375,7 @@ class ChatMessageItem extends StatelessWidget {
             const SizedBox(width: 8),
             Text(
               'Voice Message',
-              style: TextStyle(
-                color: isMine ? Colors.white : Colors.black87,
-              ),
+              style: TextStyle(color: isMine ? Colors.white : Colors.black87),
             ),
           ],
         ),
@@ -361,10 +392,16 @@ class ChatMessageItem extends StatelessWidget {
             if (await canLaunchUrl(url)) {
               await launchUrl(url);
             } else {
-              AppSnackbar.showError(context: context, message: 'Cannot open video');
+              AppSnackbar.showError(
+                context: context,
+                message: 'Cannot open video',
+              );
             }
           } catch (e) {
-            AppSnackbar.showError(context: context, message: 'Error opening video: $e');
+            AppSnackbar.showError(
+              context: context,
+              message: 'Error opening video: $e',
+            );
           }
         }
       },
@@ -381,7 +418,11 @@ class ChatMessageItem extends StatelessWidget {
             child: ClipRRect(
               borderRadius: BorderRadius.circular(8),
               child: const Center(
-                child: Icon(Icons.video_library, color: Colors.white54, size: 40),
+                child: Icon(
+                  Icons.video_library,
+                  color: Colors.white54,
+                  size: 40,
+                ),
               ),
             ),
           ),
@@ -408,10 +449,16 @@ class ChatMessageItem extends StatelessWidget {
             if (await canLaunchUrl(url)) {
               await launchUrl(url);
             } else {
-              AppSnackbar.showError(context: context, message: 'Cannot open file');
+              AppSnackbar.showError(
+                context: context,
+                message: 'Cannot open file',
+              );
             }
           } catch (e) {
-            AppSnackbar.showError(context: context, message: 'Error opening file: $e');
+            AppSnackbar.showError(
+              context: context,
+              message: 'Error opening file: $e',
+            );
           }
         }
       },
@@ -425,9 +472,11 @@ class ChatMessageItem extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             Icon(
-              message.fileType == 'pdf' ? Icons.picture_as_pdf :
-              message.fileType == 'zip' ? Icons.folder_zip :
-              Icons.insert_drive_file,
+              message.fileType == 'pdf'
+                  ? Icons.picture_as_pdf
+                  : message.fileType == 'zip'
+                  ? Icons.folder_zip
+                  : Icons.insert_drive_file,
               color: isMine ? Colors.white : AppTheme.primaryColor,
             ),
             const SizedBox(width: 8),
@@ -437,9 +486,7 @@ class ChatMessageItem extends StatelessWidget {
                 message.fileName ?? 'File',
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  color: isMine ? Colors.white : Colors.black87,
-                ),
+                style: TextStyle(color: isMine ? Colors.white : Colors.black87),
               ),
             ),
           ],
@@ -466,7 +513,7 @@ class _FullScreenImageViewer extends StatefulWidget {
 
 class _FullScreenImageViewerState extends State<_FullScreenImageViewer> {
   bool _isLoading = false;
-  
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -506,29 +553,35 @@ class _FullScreenImageViewerState extends State<_FullScreenImageViewer> {
                 child: CachedNetworkImage(
                   imageUrl: widget.imageUrl,
                   fit: BoxFit.contain,
-                  placeholder: (context, url) => const Center(
-                    child: CircularProgressIndicator(color: Colors.white),
-                  ),
-                  errorWidget: (context, url, error) => Center(
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Icon(Icons.broken_image, size: 80, color: Colors.white70),
-                        const SizedBox(height: 16),
-                        const Text(
-                          'Failed to load high-resolution image',
-                          style: TextStyle(color: Colors.white70),
+                  placeholder:
+                      (context, url) => const Center(
+                        child: CircularProgressIndicator(color: Colors.white),
+                      ),
+                  errorWidget:
+                      (context, url, error) => Center(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(
+                              Icons.broken_image,
+                              size: 80,
+                              color: Colors.white70,
+                            ),
+                            const SizedBox(height: 16),
+                            const Text(
+                              'Failed to load high-resolution image',
+                              style: TextStyle(color: Colors.white70),
+                            ),
+                            const SizedBox(height: 16),
+                            ElevatedButton(
+                              onPressed: () {
+                                launchUrl(Uri.parse(widget.imageUrl));
+                              },
+                              child: const Text('Open in Browser'),
+                            ),
+                          ],
                         ),
-                        const SizedBox(height: 16),
-                        ElevatedButton(
-                          onPressed: () {
-                            launchUrl(Uri.parse(widget.imageUrl));
-                          },
-                          child: const Text('Open in Browser'),
-                        ),
-                      ],
-                    ),
-                  ),
+                      ),
                 ),
               ),
             ),
@@ -550,31 +603,28 @@ class _FullScreenImageViewerState extends State<_FullScreenImageViewer> {
       setState(() {
         _isLoading = true;
       });
-      
+
       // Download the image
       final response = await http.get(Uri.parse(widget.imageUrl));
       if (response.statusCode != 200) {
         throw Exception('Failed to download image');
       }
-      
+
       // Get temporary directory to save the file
       final directory = await getTemporaryDirectory();
       final filePath = '${directory.path}/${widget.fileName}';
-      
+
       // Write the file
       final file = File(filePath);
       await file.writeAsBytes(response.bodyBytes);
-      
+
       // Share the image instead of saving to gallery
-      await Share.shareXFiles(
-        [XFile(filePath)],
-        text: 'Check out this image!',
-      );
-      
+      await Share.shareXFiles([XFile(filePath)], text: 'Check out this image!');
+
       setState(() {
         _isLoading = false;
       });
-      
+
       if (!context.mounted) return;
       AppSnackbar.showSuccess(
         context: context,
@@ -584,7 +634,7 @@ class _FullScreenImageViewerState extends State<_FullScreenImageViewer> {
       setState(() {
         _isLoading = false;
       });
-      
+
       if (!context.mounted) return;
       AppSnackbar.showError(
         context: context,
@@ -598,27 +648,24 @@ class _FullScreenImageViewerState extends State<_FullScreenImageViewer> {
       setState(() {
         _isLoading = true;
       });
-      
+
       // Download the image first
       final response = await http.get(Uri.parse(widget.imageUrl));
       if (response.statusCode != 200) {
         throw Exception('Failed to download image for sharing');
       }
-      
+
       // Get temporary directory to save the file
       final directory = await getTemporaryDirectory();
       final filePath = '${directory.path}/${widget.fileName}';
-      
+
       // Write the file
       final file = File(filePath);
       await file.writeAsBytes(response.bodyBytes);
-      
+
       // Share the image
-      await Share.shareXFiles(
-        [XFile(filePath)],
-        text: 'Check out this image!',
-      );
-      
+      await Share.shareXFiles([XFile(filePath)], text: 'Check out this image!');
+
       setState(() {
         _isLoading = false;
       });
@@ -626,7 +673,7 @@ class _FullScreenImageViewerState extends State<_FullScreenImageViewer> {
       setState(() {
         _isLoading = false;
       });
-      
+
       if (!context.mounted) return;
       AppSnackbar.showError(
         context: context,
@@ -642,7 +689,7 @@ class _FullScreenImageViewerState extends State<_FullScreenImageViewer> {
       context: context,
       message: 'Forward functionality to be implemented',
     );
-    
+
     // Example of what this might look like:
     // Navigator.of(context).push(
     //   MaterialPageRoute(
@@ -654,4 +701,4 @@ class _FullScreenImageViewerState extends State<_FullScreenImageViewer> {
     //   ),
     // );
   }
-} 
+}

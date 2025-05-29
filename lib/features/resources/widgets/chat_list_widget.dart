@@ -5,6 +5,7 @@ import 'package:acumen/features/chat/models/chat_conversation_model.dart';
 import 'package:acumen/features/resources/screens/resource_chat_detail_screen.dart';
 import 'package:acumen/theme/app_theme.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:acumen/features/auth/controllers/auth_controller.dart';
 
 class ChatListWidget extends StatefulWidget {
   final String? selectedConversationId;
@@ -45,29 +46,38 @@ class _ChatListWidgetState extends State<ChatListWidget> {
     for (final conversation in conversations) {
       try {
         // Get messages directly from Firestore to check for media
-        final messagesSnapshot = await FirebaseFirestore.instance
-            .collection('chats')
-            .doc(conversation.id)
-            .collection('messages')
-            .where('fileUrl', isNotEqualTo: null)
-            .limit(1)
-            .get();
+        final messagesSnapshot =
+            await FirebaseFirestore.instance
+                .collection('chats')
+                .doc(conversation.id)
+                .collection('messages')
+                .where('fileUrl', isNotEqualTo: null)
+                .limit(1)
+                .get();
 
         final hasMedia = messagesSnapshot.docs.isNotEmpty;
-        print("DEBUG: Conversation ${conversation.id} (${conversation.participantName}): hasMedia = $hasMedia");
-        
+        print(
+          "DEBUG: Conversation ${conversation.id} (${conversation.participantName}): hasMedia = $hasMedia",
+        );
+
         if (hasMedia) {
-          print("DEBUG: Found media in conversation with ${conversation.participantName}");
+          print(
+            "DEBUG: Found media in conversation with ${conversation.participantName}",
+          );
         }
 
         _conversationsWithMedia[conversation.id] = hasMedia;
       } catch (e) {
-        print("DEBUG: Error checking media for conversation ${conversation.id}: $e");
+        print(
+          "DEBUG: Error checking media for conversation ${conversation.id}: $e",
+        );
         _conversationsWithMedia[conversation.id] = false;
       }
     }
 
-    print("DEBUG: Final conversations with media: ${_conversationsWithMedia.entries.where((e) => e.value).length}");
+    print(
+      "DEBUG: Final conversations with media: ${_conversationsWithMedia.entries.where((e) => e.value).length}",
+    );
     setState(() {
       _isLoading = false;
     });
@@ -77,133 +87,298 @@ class _ChatListWidgetState extends State<ChatListWidget> {
   Widget build(BuildContext context) {
     return Consumer<ChatController>(
       builder: (context, chatController, child) {
-        final conversations = chatController.conversations;
-        
-        if (chatController.isLoading || _isLoading) {
+        if (chatController.isLoading) {
           return const Center(child: CircularProgressIndicator());
         }
-
-        print("DEBUG: Building chat list with ${conversations.length} total conversations");
-        
-        // Filter to only show conversations with media
-        final conversationsWithMedia = conversations.where(
-          (conversation) => _conversationsWithMedia[conversation.id] == true
-        ).toList();
-
-        print("DEBUG: Found ${conversationsWithMedia.length} conversations with media");
-
-        if (conversationsWithMedia.isEmpty) {
+        if (chatController.error != null) {
+          return Center(child: Text('Error: \\${chatController.error}'));
+        }
+        final authController = Provider.of<AuthController>(
+          context,
+          listen: false,
+        );
+        final currentUserId = authController.currentUser?.uid;
+        final soloChats =
+            chatController.conversations
+                .where(
+                  (chat) =>
+                      !chat.isGroup && chat.participantId != currentUserId,
+                )
+                .toList();
+        final groupChats =
+            chatController.conversations.where((chat) => chat.isGroup).toList();
+        if (soloChats.isEmpty && groupChats.isEmpty) {
           return Center(
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                const Icon(
-                  Icons.image_not_supported,
+                Icon(
+                  Icons.chat_bubble_outline,
                   size: 64,
-                  color: Colors.grey,
+                  color: Colors.grey[300],
                 ),
                 const SizedBox(height: 16),
                 const Text(
-                  'No media resources found',
+                  'No conversations yet!',
                   style: TextStyle(
                     fontSize: 18,
+                    fontWeight: FontWeight.bold,
                     color: Colors.grey,
                   ),
                 ),
                 const SizedBox(height: 8),
                 const Text(
-                  'Chats containing photos, videos, or files will appear here',
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: Colors.grey,
-                  ),
+                  'Tap the + button below or select a student to start a new chat.',
                   textAlign: TextAlign.center,
+                  style: TextStyle(fontSize: 16, color: Colors.grey),
                 ),
               ],
             ),
           );
         }
-
-        return ListView.builder(
-          padding: const EdgeInsets.symmetric(vertical: 8),
-          itemCount: conversationsWithMedia.length,
-          itemBuilder: (context, index) {
-            final conversation = conversationsWithMedia[index];
-            final isSelected = conversation.id == widget.selectedConversationId;
-            
-            return ListTile(
-              selected: isSelected,
-              selectedTileColor: AppTheme.primaryColor.withOpacity(0.1),
-              leading: CircleAvatar(
-                backgroundColor: conversation.isGroup 
-                    ? Colors.orange 
-                    : AppTheme.primaryColor,
-                child: Stack(
-                  children: [
-                    Icon(
-                      conversation.isGroup 
-                          ? Icons.group 
-                          : Icons.person,
-                      color: Colors.white,
-                    ),
-                    Positioned(
-                      right: -2,
-                      bottom: -2,
-                      child: Container(
-                        padding: const EdgeInsets.all(2),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                        child: const Icon(
-                          Icons.attach_file, 
-                          size: 10, 
-                          color: AppTheme.primaryColor,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              title: Text(
-                conversation.participantName,
-                style: const TextStyle(
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              subtitle: Text(
-                'Contains media files',
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-              trailing: conversation.isGroup
-                  ? IconButton(
-                      icon: const Icon(Icons.more_vert),
-                      onPressed: () => widget.onShowDeleteOptions(
-                        conversation.id,
-                        conversation,
-                      ),
-                    )
-                  : IconButton(
-                      icon: const Icon(Icons.more_vert),
-                      onPressed: () => widget.onShowSoloChatOptions(conversation.id),
-                    ),
-              onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => ResourceChatDetailScreen(
-                      conversationId: conversation.id,
-                      conversationName: conversation.participantName,
-                      isGroup: conversation.isGroup,
-                    ),
-                  ),
-                );
-              },
-            );
+        return RefreshIndicator(
+          onRefresh: () async {
+            await chatController.reloadConversations();
           },
+          child: ListView(
+            padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
+            children: [
+              if (groupChats.isNotEmpty) ...[
+                const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 8.0),
+                  child: Text(
+                    'Groups',
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                  ),
+                ),
+                ...groupChats.map((conversation) {
+                  final isSelected =
+                      widget.selectedConversationId == conversation.id;
+                  final isUnread = conversation.hasUnreadMessages;
+                  final isOnline = false; // TODO: implement real online logic
+                  return InkWell(
+                    onLongPress:
+                        () => widget.onShowDeleteOptions(
+                          conversation.id,
+                          conversation,
+                        ),
+                    child: Container(
+                      color:
+                          isSelected
+                              ? Colors.grey.withOpacity(0.1)
+                              : Colors.transparent,
+                      child: ListTile(
+                        leading: Stack(
+                          children: [
+                            CircleAvatar(
+                              backgroundColor:
+                                  conversation.isGroup
+                                      ? Colors.orange
+                                      : AppTheme.primaryColor,
+                              child: Stack(
+                                children: [
+                                  Icon(
+                                    conversation.isGroup
+                                        ? Icons.group
+                                        : Icons.person,
+                                    color: Colors.white,
+                                  ),
+                                  Positioned(
+                                    right: -2,
+                                    bottom: -2,
+                                    child: Container(
+                                      padding: const EdgeInsets.all(2),
+                                      decoration: BoxDecoration(
+                                        color: Colors.white,
+                                        borderRadius: BorderRadius.circular(6),
+                                      ),
+                                      child: const Icon(
+                                        Icons.attach_file,
+                                        size: 10,
+                                        color: AppTheme.primaryColor,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            if (isOnline)
+                              Positioned(
+                                right: 0,
+                                bottom: 0,
+                                child: Container(
+                                  width: 12,
+                                  height: 12,
+                                  decoration: BoxDecoration(
+                                    color: Colors.green,
+                                    shape: BoxShape.circle,
+                                    border: Border.all(
+                                      color: Colors.white,
+                                      width: 2,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                          ],
+                        ),
+                        title: Text(
+                          conversation.participantName,
+                          style: TextStyle(
+                            fontWeight:
+                                isUnread ? FontWeight.bold : FontWeight.normal,
+                          ),
+                        ),
+                        subtitle: Text(
+                          'Contains media files',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        trailing: IconButton(
+                          icon: const Icon(Icons.more_vert),
+                          onPressed:
+                              () => widget.onShowDeleteOptions(
+                                conversation.id,
+                                conversation,
+                              ),
+                        ),
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder:
+                                  (context) => ResourceChatDetailScreen(
+                                    conversationId: conversation.id,
+                                    conversationName:
+                                        conversation.participantName,
+                                    isGroup: conversation.isGroup,
+                                  ),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                  );
+                }).toList(),
+              ],
+              if (soloChats.isNotEmpty) ...[
+                const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 8.0),
+                  child: Text(
+                    'Direct Messages',
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                  ),
+                ),
+                ...soloChats.map((conversation) {
+                  final isSelected =
+                      widget.selectedConversationId == conversation.id;
+                  final isUnread = conversation.hasUnreadMessages;
+                  final isOnline = false; // TODO: implement real online logic
+                  return InkWell(
+                    onLongPress:
+                        () => widget.onShowDeleteOptions(
+                          conversation.id,
+                          conversation,
+                        ),
+                    child: Container(
+                      color:
+                          isSelected
+                              ? Colors.grey.withOpacity(0.1)
+                              : Colors.transparent,
+                      child: ListTile(
+                        leading: Stack(
+                          children: [
+                            CircleAvatar(
+                              backgroundColor:
+                                  conversation.isGroup
+                                      ? Colors.orange
+                                      : AppTheme.primaryColor,
+                              child: Stack(
+                                children: [
+                                  Icon(
+                                    conversation.isGroup
+                                        ? Icons.group
+                                        : Icons.person,
+                                    color: Colors.white,
+                                  ),
+                                  Positioned(
+                                    right: -2,
+                                    bottom: -2,
+                                    child: Container(
+                                      padding: const EdgeInsets.all(2),
+                                      decoration: BoxDecoration(
+                                        color: Colors.white,
+                                        borderRadius: BorderRadius.circular(6),
+                                      ),
+                                      child: const Icon(
+                                        Icons.attach_file,
+                                        size: 10,
+                                        color: AppTheme.primaryColor,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            if (isOnline)
+                              Positioned(
+                                right: 0,
+                                bottom: 0,
+                                child: Container(
+                                  width: 12,
+                                  height: 12,
+                                  decoration: BoxDecoration(
+                                    color: Colors.green,
+                                    shape: BoxShape.circle,
+                                    border: Border.all(
+                                      color: Colors.white,
+                                      width: 2,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                          ],
+                        ),
+                        title: Text(
+                          conversation.participantName,
+                          style: TextStyle(
+                            fontWeight:
+                                isUnread ? FontWeight.bold : FontWeight.normal,
+                          ),
+                        ),
+                        subtitle: Text(
+                          'Contains media files',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        trailing: IconButton(
+                          icon: const Icon(Icons.more_vert),
+                          onPressed:
+                              () =>
+                                  widget.onShowSoloChatOptions(conversation.id),
+                        ),
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder:
+                                  (context) => ResourceChatDetailScreen(
+                                    conversationId: conversation.id,
+                                    conversationName:
+                                        conversation.participantName,
+                                    isGroup: conversation.isGroup,
+                                  ),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                  );
+                }).toList(),
+              ],
+            ],
+          ),
         );
       },
     );
   }
-} 
+}
