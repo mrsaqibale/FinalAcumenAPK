@@ -7,12 +7,12 @@ import 'package:image_picker/image_picker.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:acumen/features/dashboard/utils/loading_dialog.dart';
 import 'package:acumen/theme/app_colors.dart';
+import 'package:acumen/features/profile/models/skill_model.dart';
 import '../repositories/profile_repository.dart';
 import '../widgets/profile_image_widget.dart';
 import '../widgets/profile_edit_field.dart';
 import '../widgets/profile_skills_widget.dart';
 import 'package:acumen/utils/app_snackbar.dart';
-import '../models/skill_model.dart';
 
 class EditProfileScreen extends StatefulWidget {
   const EditProfileScreen({super.key});
@@ -274,20 +274,20 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         ),
       ),
       body: Stack(
-        children: [
-          Column(
-            children: [
-              const SizedBox(height: 80),
-              Expanded(
-                child: Container(
-                  width: double.infinity,
-                  decoration: const BoxDecoration(
-                    color: AppColors.background,
-                    borderRadius: BorderRadius.only(
-                      topLeft: Radius.circular(30),
-                      topRight: Radius.circular(30),
-                    ),
-                  ),
+                children: [
+                  Column(
+                    children: [
+                      const SizedBox(height: 80),
+                      Expanded(
+                        child: Container(
+                          width: double.infinity,
+                          decoration: const BoxDecoration(
+                            color: AppColors.background,
+                            borderRadius: BorderRadius.only(
+                              topLeft: Radius.circular(30),
+                              topRight: Radius.circular(30),
+                            ),
+                          ),
                   child: _isLoading
                       ? const Center(
                           child: CircularProgressIndicator(color: AppColors.primary),
@@ -300,109 +300,110 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                               ),
                             )
                           : SingleChildScrollView(
-                              controller: _scrollController,
-                              child: Form(
-                                key: _formKey,
-                                child: Padding(
-                                  padding: const EdgeInsets.fromLTRB(
-                                    20,
-                                    60,
-                                    20,
-                                    20,
-                                  ),
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      // Name field
-                                      const Text(
-                                        'Name',
-                                        style: TextStyle(
-                                          fontSize: 18,
-                                          fontWeight: FontWeight.bold,
-                                          color: Colors.black,
-                                        ),
+                            controller: _scrollController,
+                            child: Form(
+                              key: _formKey,
+                              child: Padding(
+                                padding: const EdgeInsets.fromLTRB(
+                                  20,
+                                  60,
+                                  20,
+                                  20,
+                                ),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    // Name field
+                                    const Text(
+                                      'Name',
+                                      style: TextStyle(
+                                        fontSize: 18,
+                                        fontWeight: FontWeight.bold,
+                                        color: Colors.black,
                                       ),
-                                      const SizedBox(height: 8),
-                                      ProfileEditField(
-                                        controller: _nameController,
-                                        hintText: 'Enter your name',
+                                    ),
+                                    const SizedBox(height: 8),
+                                    ProfileEditField(
+                                      controller: _nameController,
+                                      hintText: 'Enter your name',
+                                    ),
+
+                                    const SizedBox(height: 20),
+
+                                    // Bio field
+                                    const Text(
+                                      'Bio',
+                                      style: TextStyle(
+                                        fontSize: 18,
+                                        fontWeight: FontWeight.bold,
+                                        color: Colors.black,
                                       ),
+                                    ),
+                                    const SizedBox(height: 8),
+                                    ProfileEditField(
+                                      controller: _bioController,
+                                      hintText: 'Tell us about yourself',
+                                      maxLines: 3,
+                                    ),
 
-                                      const SizedBox(height: 20),
+                                    const SizedBox(height: 20),
 
-                                      // Bio field
-                                      const Text(
-                                        'Bio',
-                                        style: TextStyle(
-                                          fontSize: 18,
-                                          fontWeight: FontWeight.bold,
-                                          color: Colors.black,
-                                        ),
-                                      ),
-                                      const SizedBox(height: 8),
-                                      ProfileEditField(
-                                        controller: _bioController,
-                                        hintText: 'Tell us about yourself',
-                                        maxLines: 3,
-                                      ),
+                                    // Skills section
+                                    ProfileSkillsWidget(
+                                      skills: userSkills,
+                                      onRemoveSkill: _handleRemoveSkill,
+                                      onAddSkill: _handleAddSkill,
+                                      skillController: _skillsController,
+                                      maxSkillLength: 50,
+                                    ),
 
-                                      const SizedBox(height: 20),
+                                    const SizedBox(height: 40),
 
-                                      // Skills section
-                                      ProfileSkillsWidget(
-                                        skills: userSkills,
-                                        onRemoveSkill: _handleRemoveSkill,
-                                        onAddSkill: _handleAddSkill,
-                                        skillController: _skillsController,
-                                      ),
-
-                                      const SizedBox(height: 40),
-
-                                      // Save button
-                                      Center(
-                                        child: Container(
-                                          width: 200,
-                                          height: 45,
-                                          decoration: BoxDecoration(
-                                            color: AppColors.primary,
-                                            borderRadius: BorderRadius.circular(
-                                              25,
-                                            ),
-                                          ),
-                                          child: TextButton(
-                                            onPressed: _saveProfile,
-                                            child: const Text(
-                                              'Save',
-                                              style: TextStyle(
-                                                fontSize: 16,
-                                                fontWeight: FontWeight.bold,
-                                                color: Colors.white,
-                                              ),
-                                            ),
+                                    // Save button
+                                    Center(
+                                      child: Container(
+                                        width: 200,
+                                        height: 45,
+                                        decoration: BoxDecoration(
+                                          color: AppColors.primary,
+                                          borderRadius: BorderRadius.circular(
+                                            25,
                                           ),
                                         ),
+                                        child: TextButton(
+                                          onPressed: _saveProfile,
+                                          child: const Text(
+                                            'Save',
+                                            style: TextStyle(
+                                              fontSize: 16,
+                                              fontWeight: FontWeight.bold,
+                                              color: Colors.white,
+                                            ),
+                                          ),
+                                        ),
                                       ),
-                                    ],
-                                  ),
+                                    ),
+                                  ],
                                 ),
                               ),
                             ),
-                ),
-              ),
-            ],
-          ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
 
-          // Profile image
+                  // Profile image
           if (!_isLoading && _errorMessage == null)
-            ProfileImageWidget(
-              topPosition: _profileImageTop,
-              onCameraTap: _handleCameraTap,
-              imageUrl: _profileImageUrl,
-              imageFile: _selectedImageFile,
-              showCameraIcon: true,
-            ),
-        ],
-      ),
+                  ProfileImageWidget(
+                    topPosition: _profileImageTop,
+                    onCameraTap: _handleCameraTap,
+                    imageUrl: _profileImageUrl,
+                    imageFile: _selectedImageFile,
+                    showCameraIcon: true,
+                  ),
+                ],
+              ),
     );
   }
 }

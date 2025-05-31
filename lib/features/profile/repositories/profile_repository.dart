@@ -244,6 +244,55 @@ class ProfileRepository {
     }
   }
   
+  Future<Map<String, dynamic>> loadUserDataById(String userId) async {
+    try {
+      final userDoc = await _firestore
+          .collection('users')
+          .doc(userId)
+          .get();
+      
+      if (!userDoc.exists) {
+        throw Exception('User document not found');
+      }
+
+      final userData = userDoc.data() ?? {};
+      
+      // Load skills from the skills subcollection
+      final skillsSnapshot = await _firestore
+          .collection('users')
+          .doc(userId)
+          .collection('skills')
+          .get();
+
+      final skills = skillsSnapshot.docs.map((doc) {
+        return SkillModel.fromJson({...doc.data(), 'id': doc.id});
+      }).toList();
+
+      return {
+        'name': userData['name'] ?? '',
+        'email': userData['email'] ?? '',
+        'bio': userData['bio'] ?? 'No bio added yet.',
+        'skills': skills,
+      };
+    } catch (e) {
+      throw Exception('Failed to load user data: $e');
+    }
+  }
+
+  Future<String?> getProfileImageUrlById(String userId) async {
+    try {
+      final userDoc = await _firestore.collection('users').doc(userId).get();
+      
+      if (userDoc.exists) {
+        return userDoc.data()?['profileImageUrl'] as String?;
+      }
+      
+      return null;
+    } catch (e) {
+      throw Exception('Failed to get profile image URL: $e');
+    }
+  }
+  
   // Admin methods for skill verification
   
   static Future<List<Map<String, dynamic>>> getPendingSkillVerifications() async {

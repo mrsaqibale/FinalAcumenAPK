@@ -265,13 +265,12 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                                     size: 16,
                                   ),
                                 ),
-                              if (!isGroup &&
-                                  conversation.participantHasVerifiedSkills)
+                              if (!isGroup && conversation.participantHasVerifiedSkills)
                                 Padding(
                                   padding: const EdgeInsets.only(left: 4.0),
                                   child: Icon(
                                     FontAwesomeIcons.solidCircleCheck,
-                                    color: Colors.blue[100],
+                                    color: Colors.blue,
                                     size: 14,
                                   ),
                                 ),

@@ -11,6 +11,7 @@ class ProfileSkillsWidget extends StatelessWidget {
   final Function(String) onRemoveSkill;
   final Function(String, File?, String?) onAddSkill;
   final TextEditingController skillController;
+  final int maxSkillLength;
 
   const ProfileSkillsWidget({
     super.key,
@@ -18,6 +19,7 @@ class ProfileSkillsWidget extends StatelessWidget {
     required this.onRemoveSkill,
     required this.onAddSkill,
     required this.skillController,
+    this.maxSkillLength = 50,
   });
 
   @override
@@ -80,12 +82,36 @@ class ProfileSkillsWidget extends StatelessWidget {
                 size: 16,
               ),
             ),
-          Text(
+          Flexible(
+            child: GestureDetector(
+              onTap: () {
+                showDialog(
+                  context: context,
+                  builder: (BuildContext context) {
+                    return AlertDialog(
+                      title: const Text('Skill Name'),
+                      content: Text(skill.name),
+                      actions: <Widget>[
+                        TextButton(
+                          onPressed: () {
+                            Navigator.of(context).pop();
+                          },
+                          child: const Text('Close'),
+                        ),
+                      ],
+                    );
+                  },
+                );
+              },
+              child: Text(
             skill.name,
             style: const TextStyle(
               fontSize: 14,
               color: AppColors.primary,
               fontWeight: FontWeight.w500,
+                ),
+                overflow: TextOverflow.ellipsis,
+              ),
             ),
           ),
           const SizedBox(width: 8),
@@ -157,17 +183,20 @@ class ProfileSkillsWidget extends StatelessWidget {
         builder: (context, setState) {
           return AlertDialog(
         title: const Text('Add a new skill'),
-            content: Column(
+            content: SingleChildScrollView(
+              child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 TextField(
           controller: skillController,
-          decoration: const InputDecoration(
+                    decoration: InputDecoration(
                     labelText: 'Skill name',
             hintText: 'Enter skill name',
-            border: OutlineInputBorder(),
+                      border: const OutlineInputBorder(),
+                      counterText: '${skillController.text.length}/$maxSkillLength',
           ),
+                    maxLength: maxSkillLength,
           autofocus: true,
                 ),
                 const SizedBox(height: 16),
@@ -179,12 +208,31 @@ class ProfileSkillsWidget extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 8),
-                Row(
+                  if (selectedFile != null) ...[
+                    Text(
+                      'Selected: ${selectedFile!.path.split('/').last}',
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: Colors.grey,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                  ],
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Cancel'),
+              ),
+              const Spacer(),
+              Wrap(
+                spacing: 8,
                   children: [
-                    Expanded(
-                      child: OutlinedButton.icon(
+                  ElevatedButton.icon(
                         onPressed: () async {
-                          FilePickerResult? result = await FilePicker.platform.pickFiles(
+                      final result = await FilePicker.platform.pickFiles(
                             type: FileType.custom,
                             allowedExtensions: ['pdf', 'jpg', 'jpeg', 'png'],
                           );
@@ -192,44 +240,17 @@ class ProfileSkillsWidget extends StatelessWidget {
                           if (result != null) {
                             setState(() {
                               selectedFile = File(result.files.single.path!);
-                              fileType = result.files.single.extension == 'pdf' ? 'pdf' : 'image';
+                          fileType = result.files.single.extension;
                             });
                           }
                         },
-                        icon: Icon(selectedFile == null ? Icons.upload_file : Icons.check_circle),
-                        label: Text(selectedFile == null ? 'Choose File' : 'File Selected'),
+                    icon: const Icon(Icons.upload_file),
+                    label: Text(selectedFile != null ? 'Change file' : 'Select file'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.primary,
                       ),
                     ),
-                    if (selectedFile != null)
-                      IconButton(
-                        icon: const Icon(Icons.clear),
-                        onPressed: () {
-                          setState(() {
-                            selectedFile = null;
-                            fileType = null;
-                          });
-                        },
-                      ),
-                  ],
-                ),
-                if (selectedFile != null)
-                  Padding(
-                    padding: const EdgeInsets.only(top: 8.0),
-                    child: Text(
-                      'File type: ${fileType == 'pdf' ? 'PDF Document' : 'Image'}',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Colors.grey[700],
-                      ),
-                    ),
-                  ),
-              ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
+                  const SizedBox(height: 8),
           ElevatedButton(
             onPressed: () {
               final newSkill = skillController.text.trim();
@@ -247,6 +268,8 @@ class ProfileSkillsWidget extends StatelessWidget {
               backgroundColor: AppColors.primary,
             ),
             child: const Text('Add'),
+                  ),
+                ],
           ),
         ],
           );

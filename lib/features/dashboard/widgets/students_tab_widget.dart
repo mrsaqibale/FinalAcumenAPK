@@ -2,14 +2,51 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:acumen/features/auth/controllers/auth_controller.dart';
 import 'package:acumen/features/chat/controllers/chat_controller.dart';
+import 'package:acumen/features/profile/screens/view_profile_screen.dart';
 import 'package:acumen/theme/app_theme.dart';
 import 'package:acumen/utils/app_snackbar.dart';
 
 class StudentsTabWidget extends StatelessWidget {
   const StudentsTabWidget({Key? key}) : super(key: key);
 
+  Future<void> _startDirectChat(BuildContext context, Map<String, dynamic> student) async {
+    try {
+      final chatController = Provider.of<ChatController>(context, listen: false);
+      final conversationId = await chatController.createOrGetDirectChat(student['id']);
+      
+      if (context.mounted) {
+        Navigator.pushNamed(
+          context,
+          '/chat_detail',
+          arguments: {
+            'conversationId': conversationId,
+            'title': student['name'],
+          },
+        );
+      }
+    } catch (e) {
+      if (context.mounted) {
+        AppSnackbar.showError(
+          context: context,
+          message: 'Failed to start chat: $e',
+        );
+      }
+    }
+  }
+
+  void _viewProfile(BuildContext context, Map<String, dynamic> student) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => ViewProfileScreen(userId: student['id']),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    return Consumer<ChatController>(
+      builder: (context, chatController, _) {
     return FutureBuilder<List<Map<String, dynamic>>>(
       future: Provider.of<AuthController>(context, listen: false).getStudents(),
       builder: (context, snapshot) {
@@ -41,6 +78,8 @@ class StudentsTabWidget extends StatelessWidget {
             final student = activeStudents[index];
             return Card(
               margin: const EdgeInsets.only(bottom: 8),
+                  child: InkWell(
+                    onTap: () => _viewProfile(context, student),
               child: ListTile(
                 leading: CircleAvatar(
                   backgroundColor: AppTheme.primaryColor.withOpacity(0.2),
@@ -59,55 +98,13 @@ class StudentsTabWidget extends StatelessWidget {
                   onPressed: () => _startDirectChat(context, student),
                 ),
               ),
+                  ),
+                );
+              },
             );
           },
         );
       },
-    );
-  }
-
-  void _startDirectChat(BuildContext context, Map<String, dynamic> student) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Start Chat'),
-        content: Text('Start a direct chat with ${student['name']}?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('CANCEL'),
-          ),
-          TextButton(
-            onPressed: () async {
-              Navigator.pop(context);
-              
-              try {
-                final chatController = Provider.of<ChatController>(context, listen: false);
-                final conversation = await chatController.createConversation(
-                  participantId: student['id'] as String,
-                  participantName: student['name'] as String,
-                  participantImageUrl: null,
-                );
-                
-                if (context.mounted) {
-                  AppSnackbar.showSuccess(
-                    context: context,
-                    message: 'Chat created successfully',
-                  );
-                }
-              } catch (e) {
-                if (context.mounted) {
-                  AppSnackbar.showError(
-                    context: context,
-                    message: 'Failed to create chat: $e',
-                  );
-                }
-              }
-            },
-            child: const Text('START CHAT'),
-          ),
-        ],
-      ),
     );
   }
 } 

@@ -81,7 +81,7 @@ class MyApp extends StatelessWidget {
     return MultiProvider(
       providers: [
         ChangeNotifierProvider(create: (_) => UserController()),
-        ChangeNotifierProvider(create: (_) => ChatController()),
+        ChangeNotifierProvider(create: (_) => ChatController.getInstance()),
         ChangeNotifierProvider(create: (_) => NotificationController()),
         ChangeNotifierProvider(create: (_) => AuthController()),
         ChangeNotifierProvider(create: (_) => EventController()),

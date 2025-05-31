@@ -17,7 +17,10 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:uuid/uuid.dart';
 
 class ChatController extends ChangeNotifier {
-  bool _isLoading = true;
+  static ChatController? _instance;
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final FirebaseAuth _auth = FirebaseAuth.instance;
+  bool _isLoading = false;
   String? _error;
   List<ChatConversation> _conversations = [];
   List<ConversationModel> _availableCommunities = [];
@@ -28,12 +31,12 @@ class ChatController extends ChangeNotifier {
   StreamSubscription? _conversationsSubscription;
   Map<String, StreamSubscription> _messageSubscriptions = {};
 
-  // Firestore references
-  final _firestore = FirebaseFirestore.instance;
-  final _usersCollection = FirebaseFirestore.instance.collection('users');
-  final _communitiesCollection = FirebaseFirestore.instance.collection(
-    'communities',
-  );
+  ChatController._();
+
+  static ChatController getInstance() {
+    _instance ??= ChatController._();
+    return _instance!;
+  }
 
   bool get isLoading => _isLoading;
   String? get error => _error;
@@ -89,7 +92,7 @@ class ChatController extends ChangeNotifier {
   // Load all conversations
   Future<void> _loadConversations() async {
     try {
-      final currentUser = FirebaseAuth.instance.currentUser;
+      final currentUser = _auth.currentUser;
       if (currentUser == null) {
         _conversations = [];
         notifyListeners();
@@ -127,7 +130,7 @@ class ChatController extends ChangeNotifier {
         String? participantImageUrl = data['participantImageUrl'];
         if (!(data['isGroup'] ?? false) && participantId.isNotEmpty) {
           try {
-            final userDoc = await _usersCollection.doc(participantId).get();
+            final userDoc = await _firestore.collection('users').doc(participantId).get();
             if (userDoc.exists) {
               final userData = userDoc.data() as Map<String, dynamic>;
               participantName = userData['name'] ?? participantName;
@@ -202,7 +205,7 @@ class ChatController extends ChangeNotifier {
 
           if (conversation != null &&
               latestMessage.senderId !=
-                  FirebaseAuth.instance.currentUser?.uid) {
+                  _auth.currentUser?.uid) {
             // Create notification for new message
             _createMessageNotification(
               conversation: conversation,
@@ -303,23 +306,23 @@ class ChatController extends ChangeNotifier {
     String? participantImageUrl,
     bool isGroup = false,
     String? conversationId,
+    bool participantHasVerifiedSkills = false,
   }) async {
     try {
-      final currentUser = FirebaseAuth.instance.currentUser;
+      final currentUser = _auth.currentUser;
       if (currentUser == null) {
         throw Exception('User must be logged in to create a conversation');
       }
-      // Always use unique chatroom ID for one-to-one chats
-      final convId =
-          isGroup
+
+      // For one-to-one chats, use a deterministic ID
+      final convId = isGroup 
               ? (conversationId ?? const Uuid().v4())
               : ChatService.getConversationId(currentUser.uid, participantId);
-      // Check if conversation already exists
+
+      // Check if conversation already exists in cache
       final existing = _conversations.firstWhere(
         (c) => c.id == convId,
-        orElse:
-            () =>
-                ChatService.getConversation(convId) ??
+        orElse: () => ChatService.getConversation(convId) ?? 
                 ChatConversation(
                   id: '',
                   participantId: '',
@@ -330,22 +333,36 @@ class ChatController extends ChangeNotifier {
                   participantHasVerifiedSkills: false,
                 ),
       );
+
       if (existing.id.isNotEmpty) {
         return existing;
       }
-      // Create a new conversation if not found
+
+      // Create new conversation document
       final conversation = await ChatService.createConversation(
         participantId: participantId,
         participantName: participantName,
         participantImageUrl: participantImageUrl,
         isGroup: isGroup,
         conversationId: convId,
+        participantHasVerifiedSkills: participantHasVerifiedSkills,
       );
-      await _loadConversations();
+
+      // Add to local cache
+      _conversations.add(conversation);
+
+      // Send initial welcome message
+      await sendMessage(
+        conversationId: convId,
+        text: "Hi! Let's start chatting.",
+        receiverId: participantId,
+      );
+
+      notifyListeners();
       return conversation;
     } catch (e) {
       if (kDebugMode) {
-        print('Error creating one-to-one conversation: $e');
+        print('Error creating conversation: $e');
       }
       rethrow;
     }
@@ -410,7 +427,7 @@ class ChatController extends ChangeNotifier {
       _isLoading = true;
       notifyListeners();
 
-      final currentUser = FirebaseAuth.instance.currentUser;
+      final currentUser = _auth.currentUser;
       if (currentUser == null) {
         if (kDebugMode) {
           print('Cannot fetch communities: User is not authenticated');
@@ -420,13 +437,13 @@ class ChatController extends ChangeNotifier {
 
       // Get all communities and filter those that the user is not a member of
       final communitiesSnapshot =
-          await FirebaseFirestore.instance
+          await _firestore
               .collection('communities')
               .where('isPublic', isEqualTo: true)
               .get();
 
       final userCommunitiesSnapshot =
-          await FirebaseFirestore.instance
+          await _firestore
               .collection('communities')
               .where('members', arrayContains: currentUser.uid)
               .get();
@@ -571,13 +588,13 @@ class ChatController extends ChangeNotifier {
       print("DEBUG: Message text: $text");
       print("DEBUG: File URL: $fileUrl, File Type: $fileType");
 
-      final currentUser = FirebaseAuth.instance.currentUser;
+      final currentUser = _auth.currentUser;
       if (currentUser == null) {
         throw Exception('User not authenticated');
       }
 
       // Get current user's data including verified skills status
-      final userDoc = await _usersCollection.doc(currentUser.uid).get();
+      final userDoc = await _firestore.collection('users').doc(currentUser.uid).get();
       final userData = userDoc.data() as Map<String, dynamic>;
       final hasVerifiedSkills = userData['hasVerifiedSkills'] ?? false;
 
@@ -612,15 +629,12 @@ class ChatController extends ChangeNotifier {
       print("DEBUG: Message data: $messageData");
 
       // Add message to community
-      await _communitiesCollection
-          .doc(communityId)
-          .collection('messages')
-          .add(messageData);
+      await _firestore.collection('communities').doc(communityId).collection('messages').add(messageData);
 
       print("DEBUG: Message added successfully");
 
       // Update community's last message with explicit timestamp
-      await _communitiesCollection.doc(communityId).update({
+      await _firestore.collection('communities').doc(communityId).update({
         'lastMessage': text,
         'lastMessageSender': userData['name'] ?? 'Unknown',
         'lastMessageAt': serverTimestamp,
@@ -701,7 +715,7 @@ class ChatController extends ChangeNotifier {
 
       // Query Firestore directly for messages with fileUrl
       final messagesSnapshot =
-          await FirebaseFirestore.instance
+          await _firestore
               .collection('chats')
               .doc(conversationId)
               .collection('messages')
@@ -742,5 +756,57 @@ class ChatController extends ChangeNotifier {
 
   Future<void> reloadConversations() async {
     await _loadConversations();
+  }
+
+  Future<String> createOrGetDirectChat(String otherUserId) async {
+    try {
+      final currentUser = _auth.currentUser;
+      if (currentUser == null) {
+        throw Exception('User not authenticated');
+      }
+
+      // Sort user IDs to ensure consistent conversation ID
+      final sortedIds = [currentUser.uid, otherUserId]..sort();
+      final conversationId = sortedIds.join('_');
+
+      // Check if conversation already exists
+      final existingConversation = await _firestore
+          .collection('conversations')
+          .doc(conversationId)
+          .get();
+
+      if (!existingConversation.exists) {
+        // Get other user's data
+        final otherUserDoc = await _firestore
+            .collection('users')
+            .doc(otherUserId)
+            .get();
+
+        if (!otherUserDoc.exists) {
+          throw Exception('User not found');
+        }
+
+        final otherUserData = otherUserDoc.data()!;
+
+        // Create new conversation
+        await _firestore
+            .collection('conversations')
+            .doc(conversationId)
+            .set({
+          'members': [currentUser.uid, otherUserId],
+          'participantId': otherUserId,
+          'participantName': otherUserData['name'] ?? 'Unknown',
+          'participantImageUrl': otherUserData['photoUrl'],
+          'lastMessage': '',
+          'lastMessageAt': FieldValue.serverTimestamp(),
+          'isGroup': false,
+          'createdAt': FieldValue.serverTimestamp(),
+        });
+      }
+
+      return conversationId;
+    } catch (e) {
+      throw Exception('Failed to create or get direct chat: $e');
+    }
   }
 }

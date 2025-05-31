@@ -3,6 +3,7 @@ import 'package:acumen/features/chat/screens/chats_screen.dart';
 import 'package:acumen/features/notification/screens/notifications_screen.dart';
 import 'package:acumen/features/profile/screens/edit_profile_screen.dart';
 import 'package:acumen/features/profile/screens/mentors_screen.dart';
+import 'package:acumen/features/profile/screens/skilled_persons_screen.dart';
 import 'package:acumen/features/events/screens/event_notifications_screen.dart';
 import 'package:acumen/features/resources/screens/resources_screen.dart';
 import 'package:acumen/theme/app_theme.dart';
@@ -28,6 +29,17 @@ class DashboardMenuItems extends StatelessWidget {
           );
         },
       },
+         {
+        'title': 'Resources',
+        'subtitle': 'Explore resources',
+        'icon': Icons.menu_book_rounded,
+        'onTap': () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (context) => const ResourcesScreen()),
+          );
+        },
+      },
       {
         'title': 'Event Managment',
         'subtitle': 'Event to explore',
@@ -43,51 +55,41 @@ class DashboardMenuItems extends StatelessWidget {
         },
       },
       {
-        'title': 'Update Profile',
-        'subtitle': 'Keep your data up-to-date',
+        'title': 'Collaboration / Communication',
+        'subtitle': 'Connect with others',
         'icon': 'assets/images/icons/user.png',
         'onTap': () {
           Navigator.push(
             context,
-            MaterialPageRoute(builder: (context) => const EditProfileScreen()),
+            MaterialPageRoute(builder: (context) => const ChatsScreen()),
           );
         },
       },
       {
-        'title': 'Skill',
+        'title': 'Skilled Person',
         'subtitle': 'Connect to get guidance',
         'icon': 'assets/images/icons/chartboard.png',
         'onTap': () {
           Navigator.push(
             context,
-            MaterialPageRoute(builder: (context) => ChatsScreen()),
+            MaterialPageRoute(builder: (context) => const SkilledPersonsScreen()),
           );
         },
       },
-      {
-        'title': 'Notification',
-        'subtitle': 'view all notification here',
-        'icon': 'assets/images/icons/bell.png',
-        'onTap': () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => const NotificationsScreen(),
-            ),
-          );
-        },
-      },
-      {
-        'title': 'Resources',
-        'subtitle': 'Explore resources',
-        'icon': Icons.menu_book_rounded,
-        'onTap': () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(builder: (context) => const ResourcesScreen()),
-          );
-        },
-      },
+      // {
+      //   'title': 'Notification',
+      //   'subtitle': 'view all notification here',
+      //   'icon': 'assets/images/icons/bell.png',
+      //   'onTap': () {
+      //     Navigator.push(
+      //       context,
+      //       MaterialPageRoute(
+      //         builder: (context) => const NotificationsScreen(),
+      //       ),
+      //     );
+      //   },
+      // },
+   
     ];
 
     return ListView.builder(
@@ -118,7 +120,13 @@ class DashboardMenuItems extends StatelessWidget {
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Center(
-                child: Image.asset(
+                child: item['icon'] is IconData
+                    ? Icon(
+                        item['icon'] as IconData,
+                        size: 20,
+                        color: Colors.white,
+                      )
+                    : Image.asset(
                   item['icon'] as String,
                   width: 20,
                   height: 20,

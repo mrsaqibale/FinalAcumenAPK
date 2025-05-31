@@ -1,9 +1,10 @@
+// GENERATED CODE - DO NOT MODIFY BY HAND
+
 part of 'chat_message.dart';
 
 // **************************************************************************
 // TypeAdapterGenerator
 // **************************************************************************
-
 
 class ChatMessageAdapter extends TypeAdapter<ChatMessage> {
   @override

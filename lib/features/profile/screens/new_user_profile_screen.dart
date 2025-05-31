@@ -37,24 +37,24 @@ class _NewUserProfileView extends StatelessWidget {
       body: Consumer<ProfileController>(
         builder: (context, controller, _) {
           return Stack(
+        children: [
+          // Main layout
+          Column(
             children: [
-              // Main layout
-              Column(
-                children: [
-                  // Blue section - shorter to accommodate half the profile image
-                  const SizedBox(height: 80),
-                  
-                  // White container with details
-                  Expanded(
-                    child: Container(
-                      width: double.infinity,
-                      decoration: const BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.only(
-                          topLeft: Radius.circular(30),
-                          topRight: Radius.circular(30),
-                        ),
-                      ),
+              // Blue section - shorter to accommodate half the profile image
+              const SizedBox(height: 80),
+              
+              // White container with details
+              Expanded(
+                child: Container(
+                  width: double.infinity,
+                  decoration: const BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.only(
+                      topLeft: Radius.circular(30),
+                      topRight: Radius.circular(30),
+                    ),
+                  ),
                       child: controller.isLoading
                           ? const Center(child: CircularProgressIndicator())
                           : controller.errorMessage != null
@@ -72,113 +72,117 @@ class _NewUserProfileView extends StatelessWidget {
                                       ),
                                     )
                                   : SingleChildScrollView(
-                                      child: Padding(
-                                        padding: const EdgeInsets.all(20.0),
-                                        child: Column(
-                                          crossAxisAlignment: CrossAxisAlignment.center,
-                                          children: [
-                                            // Space for the bottom half of the profile image
-                                            const SizedBox(height: 60),
-                                            
-                                            // User name with verification tick
-                                            Row(
-                                              mainAxisAlignment: MainAxisAlignment.center,
-                                              children: [
-                                                Text(
+                    child: Padding(
+                      padding: const EdgeInsets.all(20.0),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.center,
+                        children: [
+                          // Space for the bottom half of the profile image
+                          const SizedBox(height: 60),
+                          
+                          // User name with verification tick
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Text(
                                                   controller.userData!['name'],
-                                                  style: const TextStyle(
-                                                    fontSize: 24,
-                                                    fontWeight: FontWeight.bold,
-                                                  ),
-                                                ),
-                                                if (controller.userData!['isVerified'] == true)
-                                                  Padding(
-                                                    padding: const EdgeInsets.only(left: 8.0),
-                                                    child: Icon(
-                                                      FontAwesomeIcons.solidCircleCheck,
-                                                      color: Colors.blue,
-                                                      size: 18,
-                                                    ),
-                                                  ),
-                                              ],
-                                            ),
-                                            
-                                            // Email
-                                            Text(
+                                style: const TextStyle(
+                                  fontSize: 24,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                                                if ((controller.userData!['skills'] as List<SkillModel>).any((skill) => skill.isVerified))
+                                Padding(
+                                                    padding: const EdgeInsets.only(left: 4.0),
+                                  child: Icon(
+                                    FontAwesomeIcons.solidCircleCheck,
+                                    color: Colors.blue,
+                                    size: 18,
+                                  ),
+                                ),
+                            ],
+                          ),
+                          
+                          // Email
+                          Text(
                                               controller.userData!['email'],
-                                              style: const TextStyle(
-                                                fontSize: 16,
-                                                color: Colors.black54,
-                                              ),
-                                            ),
-                                            
-                                            const SizedBox(height: 20),
-                                            
-                                            // Bio
-                                            Text(
+                            style: const TextStyle(
+                              fontSize: 16,
+                              color: Colors.black54,
+                            ),
+                          ),
+                          
+                          const SizedBox(height: 20),
+                          
+                          // Bio
+                          Text(
                                               controller.userData!['bio'],
-                                              textAlign: TextAlign.center,
-                                              style: const TextStyle(
-                                                fontSize: 16,
-                                                color: Colors.black87,
-                                              ),
-                                            ),
-                                            
-                                            const SizedBox(height: 30),
-                                            
-                                            // Divider
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(
+                              fontSize: 16,
+                              color: Colors.black87,
+                            ),
+                          ),
+                          
+                          const SizedBox(height: 30),
+                          
+                          // Divider
+                          Container(
+                            height: 1,
+                            width: double.infinity,
+                            color: Colors.grey.withAlpha(77),
+                          ),
+                          
+                          const SizedBox(height: 30),
+                          
+                          // Skills section
+                          const Align(
+                            alignment: Alignment.centerLeft,
+                            child: Text(
+                              'Skills',
+                              style: TextStyle(
+                                fontSize: 20,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                          
+                          const SizedBox(height: 15),
+                          
+                                            // Skills chips with improved wrapping
                                             Container(
-                                              height: 1,
                                               width: double.infinity,
-                                              color: Colors.grey.withAlpha(77),
-                                            ),
-                                            
-                                            const SizedBox(height: 30),
-                                            
-                                            // Skills section
-                                            const Align(
-                                              alignment: Alignment.centerLeft,
-                                              child: Text(
-                                                'Skills',
-                                                style: TextStyle(
-                                                  fontSize: 20,
-                                                  fontWeight: FontWeight.bold,
-                                                ),
+                                              child: Wrap(
+                            spacing: 10,
+                            runSpacing: 10,
+                                                alignment: WrapAlignment.start,
+                                                children: _buildSkillChips(controller.userData!['skills']),
                                               ),
-                                            ),
-                                            
-                                            const SizedBox(height: 15),
-                                            
-                                            // Skills chips
-                                            Wrap(
-                                              spacing: 10,
-                                              runSpacing: 10,
-                                              children: _buildSkillChips(controller.userData!['skills']),
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                    ),
+                          ),
+                        ],
+                      ),
                     ),
-                  ),
-                ],
-              ),
-              
-              // Profile image positioned to overlap
-              Positioned(
-                top: 20,
-                left: 0,
-                right: 0,
-                child: Center(
-                  child: ProfileImageWidget(
-                    topPosition: 0,
-                    onCameraTap: () {},
-                    imageUrl: controller.profileImageUrl,
                   ),
                 ),
               ),
             ],
-          );
+          ),
+          
+          // Profile image positioned to overlap
+          Positioned(
+            top: 20,
+            left: 0,
+            right: 0,
+            child: Center(
+                  child: ProfileImageWidget(
+                    topPosition: 0,
+                    onCameraTap: () {},
+                    imageUrl: controller.profileImageUrl,
+              ),
+            ),
+          ),
+        ],
+    );
         },
       ),
     );

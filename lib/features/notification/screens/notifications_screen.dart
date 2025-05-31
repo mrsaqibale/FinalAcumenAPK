@@ -189,63 +189,63 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         child: !_isInitialized
             ? const Center(child: CircularProgressIndicator())
             : !_areNotificationsEnabled 
-                ? _buildNotificationsDisabledMessage()
-                : _isLoading
-                    ? const Center(child: CircularProgressIndicator())
-                    : Consumer<NotificationController>(
-                        builder: (context, notificationController, child) {
-                          final notifications = notificationController.notifications;
-                          
-                          if (notifications.isEmpty) {
-                            return Center(
-                              child: Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Icon(
-                                    Icons.notifications_off,
-                                    size: 48,
-                                    color: Colors.grey[400],
-                                  ),
-                                  const SizedBox(height: 16),
-                                  Text(
-                                    'No Notifications',
-                                    style: TextStyle(
-                                      fontSize: 18,
-                                      fontWeight: FontWeight.bold,
-                                      color: Colors.grey[600],
-                                    ),
-                                  ),
-                                  const SizedBox(height: 8),
-                                  Text(
-                                    'You don\'t have any notifications yet',
-                                    style: TextStyle(
-                                      fontSize: 14,
-                                      color: Colors.grey[500],
-                                    ),
-                                  ),
-                                ],
+            ? _buildNotificationsDisabledMessage()
+            : _isLoading
+                ? const Center(child: CircularProgressIndicator())
+                : Consumer<NotificationController>(
+                    builder: (context, notificationController, child) {
+                      final notifications = notificationController.notifications;
+                      
+                      if (notifications.isEmpty) {
+                        return Center(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                Icons.notifications_off,
+                                size: 48,
+                                color: Colors.grey[400],
                               ),
+                              const SizedBox(height: 16),
+                              Text(
+                                'No Notifications',
+                                style: TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.grey[600],
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              Text(
+                                'You don\'t have any notifications yet',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  color: Colors.grey[500],
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
+                      }
+                      
+                      return RefreshIndicator(
+                        onRefresh: _refreshNotifications,
+                        child: ListView.builder(
+                          padding: const EdgeInsets.all(16),
+                          itemCount: notifications.length,
+                          physics: const AlwaysScrollableScrollPhysics(),
+                          itemBuilder: (context, index) {
+                            final notification = notifications[index];
+                            return NotificationCardWidget(
+                              notification: notification,
+                              onMarkAsRead: () => notificationController.markAsRead(notification.id),
+                              onDelete: () => notificationController.deleteNotification(notification.id),
                             );
-                          }
-                          
-                          return RefreshIndicator(
-                            onRefresh: _refreshNotifications,
-                            child: ListView.builder(
-                              padding: const EdgeInsets.all(16),
-                              itemCount: notifications.length,
-                              physics: const AlwaysScrollableScrollPhysics(),
-                              itemBuilder: (context, index) {
-                                final notification = notifications[index];
-                                return NotificationCardWidget(
-                                  notification: notification,
-                                  onMarkAsRead: () => notificationController.markAsRead(notification.id),
-                                  onDelete: () => notificationController.deleteNotification(notification.id),
-                                );
-                              },
-                            ),
-                          );
-                        },
-                      ),
+                          },
+                        ),
+                      );
+                    },
+                  ),
       ),
     );
   }

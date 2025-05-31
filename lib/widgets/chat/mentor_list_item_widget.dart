@@ -4,6 +4,7 @@ import 'package:acumen/features/profile/models/user_model.dart';
 import 'package:acumen/theme/app_theme.dart';
 import 'package:acumen/widgets/cached_profile_image.dart';
 import 'package:flutter/material.dart';
+import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 
 class MentorListItemWidget extends StatelessWidget {
   final UserModel mentor;
@@ -27,7 +28,20 @@ class MentorListItemWidget extends StatelessWidget {
         placeholderColor: AppTheme.primaryColor,
         backgroundColor: Colors.grey[300]!,
       ),
-      title: Text(mentor.name),
+      title: Row(
+        children: [
+          Text(mentor.name),
+          if (mentor.hasVerifiedSkills == true)
+            Padding(
+              padding: const EdgeInsets.only(left: 4.0),
+              child: Icon(
+                FontAwesomeIcons.solidCircleCheck,
+                color: Colors.blue,
+                size: 14,
+              ),
+            ),
+        ],
+      ),
       subtitle: Text(mentor.title ?? 'Mentor'),
       onTap: () async {
         final conversation = await chatController.createConversation(

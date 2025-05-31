@@ -52,6 +52,15 @@ class ChatHeader extends StatelessWidget implements PreferredSizeWidget {
                     fontSize: 16,
                   ),
                 ),
+                if (conversation.participantHasVerifiedSkills)
+                  Padding(
+                    padding: const EdgeInsets.only(left: 4.0),
+                    child: Icon(
+                      FontAwesomeIcons.solidCircleCheck,
+                      color: Colors.blue,
+                      size: 14,
+                    ),
+                  ),
                 const Text(
                   'Online',
                   style: TextStyle(

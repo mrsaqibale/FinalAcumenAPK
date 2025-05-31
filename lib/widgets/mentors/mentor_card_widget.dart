@@ -1,8 +1,12 @@
 import 'package:acumen/features/profile/models/user_model.dart';
 import 'package:acumen/features/profile/screens/mentor_profile_screen.dart';
+import 'package:acumen/features/chat/screens/chat_detail_screen.dart';
+import 'package:acumen/features/chat/controllers/chat_controller.dart';
 import 'package:acumen/theme/app_theme.dart';
 import 'package:acumen/widgets/cached_profile_image.dart';
+import 'package:acumen/utils/app_snackbar.dart';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
 class MentorCardWidget extends StatelessWidget {
   final UserModel mentor;
@@ -11,6 +15,57 @@ class MentorCardWidget extends StatelessWidget {
     Key? key,
     required this.mentor,
   }) : super(key: key);
+
+  Future<void> _startChat(BuildContext context) async {
+    if (!mentor.isActive) {
+      AppSnackbar.showError(
+        context: context,
+        message: 'This mentor is currently inactive',
+      );
+      return;
+    }
+
+    try {
+      // Show loading indicator
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => const Center(
+          child: CircularProgressIndicator(),
+        ),
+      );
+
+      final chatController = Provider.of<ChatController>(context, listen: false);
+      final conversationId = await chatController.createOrGetDirectChat(mentor.id);
+      
+      if (!context.mounted) return;
+      
+      // Remove loading indicator
+      Navigator.pop(context);
+      
+      // Navigate to chat detail screen
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => ChatDetailScreen(
+            conversationId: conversationId,
+          ),
+        ),
+      );
+    } catch (e) {
+      if (!context.mounted) return;
+      
+      // Remove loading indicator if it's showing
+      if (Navigator.canPop(context)) {
+        Navigator.pop(context);
+      }
+      
+      AppSnackbar.showError(
+        context: context,
+        message: 'Failed to start chat: $e',
+      );
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -84,16 +139,7 @@ class MentorCardWidget extends StatelessWidget {
           ),
         ),
         trailing: const Icon(Icons.arrow_forward_ios, size: 14, color: Colors.grey),
-        onTap: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => MentorProfileScreen(
-                mentorId: mentor.id,
-              ),
-            ),
-          );
-        },
+        onTap: () => _startChat(context),
       ),
     );
   }

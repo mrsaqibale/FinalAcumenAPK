@@ -201,6 +201,7 @@ class ChatService {
     String? participantImageUrl,
     bool isGroup = false,
     String? conversationId,
+    bool participantHasVerifiedSkills = false,
   }) async {
     if (_conversationsBox == null) {
       throw Exception('ChatService not initialized');
@@ -209,59 +210,92 @@ class ChatService {
     if (currentUser == null) {
       throw Exception('User must be logged in to create a conversation');
     }
+
     // Always use unique chatroom ID for one-to-one chats
-    final convId =
-        isGroup
+    final convId = isGroup
             ? (conversationId ?? const Uuid().v4())
             : getConversationId(currentUser.uid, participantId);
+
     // Check if conversation already exists
     final existing = getConversation(convId);
     if (existing != null) {
       return existing;
     }
-    // For one-to-one chats, always set participantId/Name to the OTHER user
-    String otherUserId = participantId;
-    String otherUserName = participantName;
-    String? otherUserImageUrl = participantImageUrl;
-    if (!isGroup) {
-      if (participantId == currentUser.uid) {
-        // Defensive: shouldn't happen, but if it does, swap to the other user
-        otherUserId = currentUser.uid;
-        otherUserName = currentUser.displayName ?? 'Unknown';
-        otherUserImageUrl = currentUser.photoURL;
-      }
-    }
-    // Create new conversation
-    final conversation = ChatConversation(
-      id: convId,
-      participantId: otherUserId,
-      participantName: otherUserName,
-      participantImageUrl: otherUserImageUrl,
-      lastMessage: '',
-      lastMessageTime: DateTime.now(),
-      isGroup: isGroup,
-      participantHasVerifiedSkills: false,
-    );
+
+    // Get current user's data
+    final currentUserDoc = await _firestore.collection('users').doc(currentUser.uid).get();
+    final currentUserData = currentUserDoc.data() as Map<String, dynamic>;
+    final currentUserName = currentUserData['name'] ?? 'Unknown';
+
+    final initialMessage = "Hi! Let's start chatting.";
+    final messageId = DateTime.now().millisecondsSinceEpoch.toString();
+
     try {
       // Create conversation in Firebase
       await _firestore.collection('conversations').doc(convId).set({
         'id': convId,
-        'members': [currentUser.uid, otherUserId],
-        'participantId': otherUserId,
-        'participantName': otherUserName,
-        'participantImageUrl': otherUserImageUrl,
-        'lastMessage': '',
+        'members': [currentUser.uid, participantId],
+        'participantId': participantId,
+        'participantName': participantName,
+        'participantImageUrl': participantImageUrl,
+        'lastMessage': initialMessage,
         'lastMessageAt': FieldValue.serverTimestamp(),
-        'lastMessageSender': '',
+        'lastMessageSender': currentUserName,
         'createdAt': FieldValue.serverTimestamp(),
         'createdBy': currentUser.uid,
         'isGroup': isGroup,
         'hasUnreadMessages': false,
-        'participantHasVerifiedSkills': false,
+        'participantHasVerifiedSkills': participantHasVerifiedSkills,
       });
-      // Create message box
+
+      // Create initial message in Firebase
+      await _firestore
+          .collection('chats')
+          .doc(convId)
+          .collection('messages')
+          .doc(messageId)
+          .set({
+            'id': messageId,
+            'text': initialMessage,
+            'senderId': currentUser.uid,
+            'receiverId': participantId,
+            'timestamp': FieldValue.serverTimestamp(),
+            'isRead': false,
+            'fileUrl': null,
+            'fileName': null,
+            'fileType': 'text',
+          });
+
+      // Create new conversation object
+      final conversation = ChatConversation(
+        id: convId,
+        participantId: participantId,
+        participantName: participantName,
+        participantImageUrl: participantImageUrl,
+        lastMessage: initialMessage,
+        lastMessageTime: DateTime.now(),
+        isGroup: isGroup,
+        participantHasVerifiedSkills: participantHasVerifiedSkills,
+      );
+
+      // Create message box and save initial message locally
       final boxName = '$_messagesBoxName-$convId';
       _messageBoxes[convId] = await Hive.openBox<ChatMessage>(boxName);
+      
+      final initialChatMessage = ChatMessage(
+        id: messageId,
+        senderId: currentUser.uid,
+        receiverId: participantId,
+        text: initialMessage,
+        timestamp: DateTime.now(),
+        isRead: false,
+        fileUrl: null,
+        fileName: null,
+        fileType: 'text',
+      );
+      
+      await _messageBoxes[convId]!.put(messageId, initialChatMessage);
+
       // Save conversation locally
       await saveConversation(conversation);
       print("DEBUG: Created new conversation with ID: $convId");
@@ -270,11 +304,7 @@ class ChatService {
       if (kDebugMode) {
         print('Error creating conversation in Firebase: $e');
       }
-      // Still try to save locally as fallback
-      final boxName = '$_messagesBoxName-$convId';
-      _messageBoxes[convId] = await Hive.openBox<ChatMessage>(boxName);
-      await saveConversation(conversation);
-      return conversation;
+      rethrow;
     }
   }
 

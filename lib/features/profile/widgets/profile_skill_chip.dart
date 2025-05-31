@@ -37,11 +37,15 @@ class ProfileSkillChip extends StatelessWidget {
                     size: 14,
                   ),
                 ),
-              Text(
-                skill,
-                style: const TextStyle(
-                  fontSize: 14,
-                  color: Colors.black87,
+              Flexible(
+                child: Text(
+                  skill,
+                  style: const TextStyle(
+                    fontSize: 14,
+                    color: Colors.black87,
+                  ),
+                  softWrap: true,
+                  maxLines: 2,
                 ),
               ),
             ],

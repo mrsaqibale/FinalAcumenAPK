@@ -1,5 +1,7 @@
 import 'package:acumen/features/auth/screens/login_screen.dart';
 import 'package:acumen/features/auth/controllers/auth_controller.dart';
+import 'package:acumen/features/chat/screens/chats_screen.dart';
+import 'package:acumen/features/chat/services/chat_service.dart';
 import 'package:acumen/features/notification/screens/notifications_screen.dart';
 import 'package:acumen/features/profile/screens/edit_profile_screen.dart';
 import 'package:acumen/features/profile/screens/mentors_screen.dart';
@@ -39,6 +41,7 @@ class DashboardDrawer extends StatelessWidget {
               final name = userData?['name'] as String? ?? username;
               final email = FirebaseAuth.instance.currentUser?.email ?? '';
               final profileImageUrl = userData?['profileImageUrl'] as String?;
+              final hasVerifiedSkills = userData?['hasVerifiedSkills'] as bool? ?? false;
 
               return UserAccountsDrawerHeader(
                 decoration: const BoxDecoration(
@@ -50,9 +53,23 @@ class DashboardDrawer extends StatelessWidget {
                   radius: 36,
                   backgroundColor: Colors.white,
                 ),
-                accountName: Text(
-                  DashboardUtils.capitalizeName(name),
-                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                accountName: Row(
+                  mainAxisAlignment: MainAxisAlignment.start,
+                  children: [
+                    Text(
+                      DashboardUtils.capitalizeName(name),
+                      style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                    ),
+                    if (hasVerifiedSkills)
+                      Padding(
+                        padding: const EdgeInsets.only(left: 4.0),
+                        child: Icon(
+                          FontAwesomeIcons.solidCircleCheck,
+                          color: Colors.blue,
+                          size: 16,
+                        ),
+                      ),
+                  ],
                 ),
                 accountEmail: Text(email),
               );
@@ -119,7 +136,7 @@ class DashboardDrawer extends StatelessWidget {
                     Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (context) => const MentorsScreen(),
+                        builder: (context) => MentorsScreen(),
                       ),
                     );
                   },

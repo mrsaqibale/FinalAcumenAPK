@@ -2,6 +2,7 @@ import 'package:acumen/features/chat/controllers/chat_controller.dart';
 import 'package:acumen/features/chat/controllers/message_controller.dart';
 import 'package:acumen/features/chat/widgets/message_components.dart';
 import 'package:acumen/theme/app_theme.dart';
+import 'package:acumen/widgets/cached_profile_image.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -375,6 +376,7 @@ class _CommunityChatMessageListState extends State<CommunityChatMessageList> {
     final bool isOptimistic = message['isOptimistic'] == true;
     final bool isUploading = message['isUploading'] == true;
     final String? error = message['error'] as String?;
+    final bool hasVerifiedSkills = message['senderHasVerifiedSkills'] == true;
     
     // Handle timestamp with fallbacks
     DateTime timestamp;
@@ -816,13 +818,19 @@ class _CommunityChatMessageListState extends State<CommunityChatMessageList> {
                               child: Row(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
+                                  CachedProfileImage(
+                                    imageUrl: message['senderImageUrl'],
+                                    size: 32,
+                                    radius: 16,
+                                  ),
+                                  const SizedBox(width: 8),
                                   Text(
-                                message['senderName'] as String? ?? 'Unknown',
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.grey.shade700,
-                                ),
+                                    message['senderName'] ?? 'Unknown',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.grey.shade700,
+                                    ),
                                   ),
                                   if (message['senderHasVerifiedSkills'] == true)
                                     Padding(
@@ -830,7 +838,7 @@ class _CommunityChatMessageListState extends State<CommunityChatMessageList> {
                                       child: Icon(
                                         FontAwesomeIcons.solidCircleCheck,
                                         color: Colors.blue,
-                                        size: 12,
+                                        size: 14,
                                       ),
                                     ),
                                 ],
