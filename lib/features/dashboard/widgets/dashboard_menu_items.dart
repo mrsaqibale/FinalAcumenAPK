@@ -7,6 +7,7 @@ import 'package:acumen/features/events/screens/event_notifications_screen.dart';
 import 'package:acumen/features/resources/screens/resources_screen.dart';
 import 'package:acumen/theme/app_theme.dart';
 import 'package:flutter/material.dart';
+import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 
 class DashboardMenuItems extends StatelessWidget {
   const DashboardMenuItems({super.key});
@@ -79,7 +80,7 @@ class DashboardMenuItems extends StatelessWidget {
       {
         'title': 'Resources',
         'subtitle': 'Explore resources',
-        'icon': 'assets/images/icons/resources.png',
+        'icon': Icons.menu_book_rounded,
         'onTap': () {
           Navigator.push(
             context,
