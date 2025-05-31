@@ -826,11 +826,11 @@ class _CommunityChatMessageListState extends State<CommunityChatMessageList> {
                                   const SizedBox(width: 8),
                                   Text(
                                     message['senderName'] ?? 'Unknown',
-                                    style: TextStyle(
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.bold,
-                                      color: Colors.grey.shade700,
-                                    ),
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.grey.shade700,
+                                ),
                                   ),
                                   if (message['senderHasVerifiedSkills'] == true)
                                     Padding(

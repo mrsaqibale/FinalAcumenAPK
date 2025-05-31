@@ -63,25 +63,25 @@ class DashboardHeader extends StatelessWidget {
           final hasVerifiedSkills = userData['hasVerifiedSkills'] as bool? ?? false;
 
           return Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                'Hello!',
-                style: TextStyle(
-                  fontSize: 18,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Hello!',
+            style: TextStyle(
+              fontSize: 18,
                   color: AppColors.textLight,
-                ),
-              ),
-              const SizedBox(height: 5),
+            ),
+          ),
+          const SizedBox(height: 5),
               Row(
                 children: [
-                  Text(
-                    DashboardUtils.capitalizeName(name),
-                    style: const TextStyle(
-                      fontSize: 24,
-                      fontWeight: FontWeight.bold,
-                      color: AppColors.textLight,
-                    ),
+          Text(
+                DashboardUtils.capitalizeName(name),
+            style: const TextStyle(
+              fontSize: 24,
+              fontWeight: FontWeight.bold,
+                  color: AppColors.textLight,
+            ),
                   ),
                   if (hasVerifiedSkills)
                     Padding(
@@ -93,8 +93,8 @@ class DashboardHeader extends StatelessWidget {
                       ),
                     ),
                 ],
-              ),
-            ],
+          ),
+        ],
           );
         },
       ),

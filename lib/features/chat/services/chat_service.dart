@@ -264,7 +264,7 @@ class ChatService {
             'fileUrl': null,
             'fileName': null,
             'fileType': 'text',
-          });
+      });
 
       // Create new conversation object
       final conversation = ChatConversation(
